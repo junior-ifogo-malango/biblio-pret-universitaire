@@ -147,6 +147,7 @@ ETU-2026-0120,Saidi,Anwar,anwar.saidi@usmba.ac.ma`;
             </div>
             <ul className="list-disc list-inside space-y-0.5 text-[11px] text-slate-600">
               <li>Colonnes requises : <strong>numéro d'étudiant</strong>, <strong>nom</strong>, <strong>prénom</strong>, <strong>e-mail académique</strong>.</li>
+              <li>Colonnes facultatives : <strong>filière</strong>, <strong>niveau</strong> (leur absence ne bloque pas l'import).</li>
               <li>Le numéro d'étudiant est la clé unique : création si nouveau, mise à jour et reconduction si existant.</li>
               <li><strong>Les étudiants absents du nouveau fichier sont automatiquement passés au statut « résilié »</strong>.</li>
               <li>La validité de l'inscription est fixée à la fin de l'année universitaire.</li>
@@ -268,7 +269,7 @@ ETU-2026-0120,Saidi,Anwar,anwar.saidi@usmba.ac.ma`;
               </div>
 
               <p className="text-[11px] text-emerald-800">
-                Les codes QR uniques et les dates d'expiration (fin d'année universitaire) ont été automatiquement mis à jour.
+                Les fiches étudiants et les dates d'expiration (fin d'année universitaire) ont été automatiquement mises à jour.
               </p>
             </div>
           )}

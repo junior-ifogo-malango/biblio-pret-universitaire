@@ -12,6 +12,7 @@ export interface IsbnLookupResult {
   pagination: number;
   resume: string;
   coverUrl?: string;
+  sommaire?: string;
 }
 
 export async function lookupBookByIsbn(rawIsbn: string): Promise<IsbnLookupResult | null> {

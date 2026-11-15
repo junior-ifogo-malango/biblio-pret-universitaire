@@ -25,12 +25,11 @@ export const BookDetailModal: React.FC = () => {
     getExemplairesByOuvrage, 
     getAdherentById, 
     emprunts, 
-    demandes,
-    annulerDemande,
     setScannedExemplaire, 
     addExemplairesToOuvrage,
     setActivePrintLabelsOuvrageId,
-    openNewLoan
+    openNewLoan,
+    updateOuvrage
   } = useLibrary();
 
   const [isAddingCopies, setIsAddingCopies] = useState(false);
@@ -42,13 +41,7 @@ export const BookDetailModal: React.FC = () => {
 
   const exList = getExemplairesByOuvrage(selectedOuvrage.id);
   const availableCount = exList.filter(e => e.statut === 'DISPONIBLE').length;
-  const activeCount = exList.filter(e => e.statut !== 'DETRUIT').length;
-
-  // Waiting queue for this ouvrage
-  const ouvrageDemandes = demandes
-    .filter(d => d.ouvrageId === selectedOuvrage.id)
-    .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-  const activeQueueDemandes = ouvrageDemandes.filter(d => d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE');
+  const activeCount = exList.length;
 
   // Loan history for this ouvrage
   const ouvrageEmprunts = emprunts.filter(e => e.ouvrageId === selectedOuvrage.id);
@@ -80,12 +73,9 @@ export const BookDetailModal: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
             <div className="w-24 sm:w-28 shrink-0 shadow-lg ring-2 ring-white/20 rounded-xl overflow-hidden">
               <BookCover
-                titre={selectedOuvrage.titre}
-                auteur={selectedOuvrage.auteur}
-                categorie={selectedOuvrage.categorie}
-                coverUrl={selectedOuvrage.coverUrl}
-                coverGradient={selectedOuvrage.coverGradient}
+                ouvrage={selectedOuvrage}
                 size="md"
+                onCacheCoverUrl={(url) => updateOuvrage(selectedOuvrage.id, { coverUrl: url })}
               />
             </div>
 
@@ -221,11 +211,7 @@ export const BookDetailModal: React.FC = () => {
                       <div>
                         <div className="font-mono font-bold text-slate-900 flex items-center gap-2">
                           <span>{ex.codeQR}</span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.2 rounded-full uppercase ${
-                            ex.etat === 'bon' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'
-                          }`}>
-                            État : {ex.etat}
-                          </span>
+
                         </div>
                         <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-slate-400" />
@@ -240,13 +226,9 @@ export const BookDetailModal: React.FC = () => {
                           ? 'bg-emerald-100 text-emerald-800'
                           : ex.statut === 'EMPRUNTE'
                             ? 'bg-amber-100 text-amber-800'
-                            : ex.statut === 'RESERVE'
-                              ? 'bg-blue-100 text-blue-800'
-                              : ex.statut === 'EN_REPARATION'
-                                ? 'bg-purple-100 text-purple-800'
-                                : ex.statut === 'PERDU'
-                                  ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-rose-100 text-rose-800'
+                            : ex.statut === 'PERDU'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-rose-100 text-rose-800'
                       }`}>
                         {ex.statut}
                       </span>
@@ -274,79 +256,6 @@ export const BookDetailModal: React.FC = () => {
                 );
               })}
             </div>
-          </div>
-
-          {/* Waiting Queue for this Ouvrage */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between">
-              <h4 className="font-bold uppercase tracking-wider text-slate-700 text-xs flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-600" />
-                File d'Attente Prioritaire ({activeQueueDemandes.length} active(s))
-              </h4>
-              <span className="text-[11px] text-slate-400">
-                Ordre strict par date d'inscription • Réservation de 24h au retour
-              </span>
-            </div>
-
-            {activeQueueDemandes.length === 0 ? (
-              <p className="text-slate-400 italic bg-slate-50 p-3 rounded-xl border border-slate-100">
-                Aucun étudiant actuellement en file d'attente pour cet ouvrage.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {activeQueueDemandes.map((dem, idx) => {
-                  const adh = getAdherentById(dem.adherentId);
-                  const isNotified = dem.statut === 'NOTIFIEE';
-                  return (
-                    <div 
-                      key={dem.id}
-                      className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                        isNotified 
-                          ? 'bg-blue-50 border-blue-300' 
-                          : 'bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
-                          isNotified ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'
-                        }`}>
-                          {idx + 1}
-                        </span>
-                        <div>
-                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                            <span>{adh?.prenom} {adh?.nom}</span>
-                            <span className="font-mono text-[11px] text-slate-500 font-normal">({adh?.numeroEtudiant})</span>
-                          </div>
-                          <div className="text-[11px] text-slate-500">
-                            Inscrit le {new Date(dem.dateInscription).toLocaleDateString('fr-FR')} • {adh?.emailAcademique}
-                          </div>
-                          {isNotified && (
-                            <div className="text-[11px] font-bold text-blue-800 mt-0.5">
-                              ⚠️ Notifié pour retrait • Date limite (24h) : {dem.dateLimiteRetrait ? new Date(dem.dateLimiteRetrait).toLocaleDateString('fr-FR') : ''}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm(`Annuler la demande de file d'attente pour ${adh?.prenom} ${adh?.nom} ?`)) {
-                              annulerDemande(dem.id);
-                            }
-                          }}
-                          className="px-2.5 py-1 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
-                        >
-                          <Ban className="w-3 h-3 text-rose-600" />
-                          Annuler demande
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {/* Loans History for this Ouvrage */}

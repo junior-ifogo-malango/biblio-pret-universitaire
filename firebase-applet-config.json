@@ -1,0 +1,12 @@
+{
+  "projectId": "gestion-pret-bibliotheque",
+  "appId": "1:44584029720:web:72fb70ead211089b6b3d6d",
+  "apiKey": "AIzaSyBS8_BD8BZN1MArMrz7WaikuRwLGMUZB5Y",
+  "authDomain": "gestion-pret-bibliotheque.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "gestion-pret-bibliotheque.firebasestorage.app",
+  "messagingSenderId": "44584029720",
+  "measurementId": "",
+  "oAuthClientId": "",
+  "recaptchaSiteKey": ""
+}

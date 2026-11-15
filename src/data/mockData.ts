@@ -1,9 +1,36 @@
-import { Ouvrage, Exemplaire, Adherent, Emprunt, DemandeAttente, EmailNotification } from '../types';
+import { Ouvrage, Exemplaire, Adherent, Emprunt, EmailNotification } from '../types';
 
 export const getRelativeDate = (offsetDays: number): string => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   return d.toISOString().split('T')[0];
+};
+
+export const getLocalCoverPath = (filename: string): string => {
+  return encodeURI(`/covers/${filename}`);
+};
+
+export const LOCAL_COVERS_MAP: Record<string, string> = {
+  ow_1: getLocalCoverPath('Clean Code A Handbook of Agile Software Craftsmanship Robert C. Martin.jpg'),
+  ow_2: getLocalCoverPath('Introduction to Algorithms Thomas H. Cormen.jpg'),
+  ow_3: getLocalCoverPath('Dictionnaire Encyclopédique des Sciences et Techniques.jpg'),
+  ow_4: getLocalCoverPath("Sapiens Une brève histoire de l'humanité Yuval Noah Harari.jpg"),
+  ow_5: getLocalCoverPath("Principes d'Économie Moderne Joseph E. Stiglitz.jpg"),
+  ow_6: getLocalCoverPath('Mathématiques pour la Licence Tout en un L1 Jean-Pierre Ramis.jpg'),
+  ow_7: getLocalCoverPath('Génie Logiciel Software Engineering Ian Sommerville.jpg'),
+  ow_8: getLocalCoverPath('Design Patterns Catalogue de modèles de conception Erich Gamma.jpg'),
+  ow_9: getLocalCoverPath('Les Réseaux Informatiques Andrew Tanenbaum.jpg'),
+  ow_10: getLocalCoverPath('Physique Générale Mécanique et Thermodynamique Marcelo Alonso Edward J. Finn.jpg'),
+  ow_11: getLocalCoverPath('Le Cours de Physique de Feynman Électromagnétisme 1 Richard Feynman.jpg'),
+  ow_12: getLocalCoverPath('Traité de Droit Civil Les Obligations Jacques Ghestin.jpg'),
+  ow_13: getLocalCoverPath('Droit Constitutionnel et Institutions Politiques Philippe Ardant.jpg'),
+  ow_14: getLocalCoverPath("L'Avantage Concurrentiel Michael Porter.jpg"),
+  ow_15: getLocalCoverPath("Histoire Universelle du XXe Siècle L'Âge des Extrêmes Eric Hobsbawm.jpg"),
+  ow_16: getLocalCoverPath('Biologie Moléculaire de la Cellule Bruce Alberts.jpg'),
+  ow_17: getLocalCoverPath('Chimie Générale et Moléculaire Structure et Réactivité Paul Arnaud.jpg'),
+  ow_18: getLocalCoverPath('Introduction à la Philosophie des Sciences Karl Popper.jpg'),
+  ow_19: getLocalCoverPath('Le Bon Usage Grammaire Fondamentale de la Langue Française Maurice Grevisse.png'),
+  ow_20: getLocalCoverPath('Anatomie et Physiologie Humaine Elaine.jpg'),
 };
 
 export const INITIAL_OUVRAGES: Ouvrage[] = [
@@ -20,7 +47,8 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Principes, motifs et bonnes pratiques indispensables pour concevoir un code lisible, maintenable et robuste.',
     empruntable: true,
     coverGradient: 'from-cyan-800 to-blue-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9780132350884-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_1,
+    sommaire: '1. Introduction\n2. Meaningful Names\n3. Functions\n4. Comments\n5. Formatting\n6. Objects and Data Structures\n7. Error Handling\n8. Boundaries\n9. Contrôle qualité\n10. Classes\n11. Systems\n12. Emergence\n13. Concurrency\n14. Successive Refinement\n15. JUnit Internals\n16. Refactoring SerialDate\n17. Smells and Heuristics'
   },
   {
     id: 'ow_2',
@@ -35,7 +63,8 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'La bible mondiale des structures de données et des algorithmes. Manuel fondamental de référence universitaire.',
     empruntable: true,
     coverGradient: 'from-blue-900 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9780262033848-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_2,
+    sommaire: 'I. Foundations\nII. Sorting and Order Statistics\nIII. Data Structures\nIV. Advanced Design and Analysis Techniques\nV. Advanced Data Structures\nVI. Graph Algorithms\nVII. Selected Topics'
   },
   {
     id: 'ow_3',
@@ -48,9 +77,10 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     cote: 'REF-SCI-01',
     pagination: 1450,
     resume: 'Ouvrage de référence exhaustif pour laboratoires et chercheurs. Consultable en salle de lecture uniquement.',
-    empruntable: false, // Consultation sur place uniquement !
+    empruntable: false,
     coverGradient: 'from-purple-900 to-indigo-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782100810000-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_3,
+    sommaire: 'A. Sciences fondamentales\nB. Techniques appliquées\nC. Mathématiques\nD. Physique\nE. Chimie\nF. Biologie\nG. Informatique\nH. Index'
   },
   {
     id: 'ow_4',
@@ -65,7 +95,8 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Comment une espèce insignifiante d\'hominidés est devenue la force dominante de la planète Terre.',
     empruntable: true,
     coverGradient: 'from-amber-700 to-yellow-800',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782226257017-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_4,
+    sommaire: '1. La révolution cognitive\n2. La révolution agricole\n3. L\'unification de l\'humanité\n4. La révolution scientifique'
   },
   {
     id: 'ow_5',
@@ -80,7 +111,8 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Macroéconomie et microéconomie appliquées aux politiques monétaires et aux marchés contemporains.',
     empruntable: true,
     coverGradient: 'from-emerald-800 to-teal-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782804149000-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_5,
+    sommaire: 'I. Introduction et outils de base\nII. Microéconomie : les marchés\nIII. Macroéconomie : la croissance et les fluctuations\nIV. Politiques économiques\nV. Économie internationale'
   },
   {
     id: 'ow_6',
@@ -95,7 +127,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Cours complet, exercices et résolutions détaillées pour les cycles universitaires scientifiques.',
     empruntable: true,
     coverGradient: 'from-violet-800 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782100821686-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_6
   },
   {
     id: 'ow_7',
@@ -110,7 +142,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Méthodes agiles, patrons d\'architecture, ingénierie des exigences et fiabilité des systèmes logiciels.',
     empruntable: true,
     coverGradient: 'from-blue-800 to-indigo-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9780133943030-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_7
   },
   {
     id: 'ow_8',
@@ -125,7 +157,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Les 23 patrons de conception classiques (GoF) pour bâtir des architectures logicielles flexibles et réutilisables.',
     empruntable: true,
     coverGradient: 'from-teal-800 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782744008788-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_8
   },
   {
     id: 'ow_9',
@@ -140,7 +172,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Modèles OSI et TCP/IP, routage, sécurité réseau, protocoles applicatifs et virtualisation des infrastructures.',
     empruntable: true,
     coverGradient: 'from-indigo-800 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782744075216-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_9
   },
   {
     id: 'ow_10',
@@ -155,7 +187,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Cinématique, dynamique newtonienne, lois de la thermodynamique et conservation de l\'énergie.',
     empruntable: true,
     coverGradient: 'from-amber-800 to-orange-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782804150501-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_10
   },
   {
     id: 'ow_11',
@@ -170,7 +202,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Équations de Maxwell, propagation des ondes électromagnétiques et optique physique moderne.',
     empruntable: true,
     coverGradient: 'from-sky-800 to-blue-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782100801206-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_11
   },
   {
     id: 'ow_12',
@@ -185,7 +217,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Régime général des obligations juridiques, contrats civils et commerciaux, et responsabilité contractuelle.',
     empruntable: true,
     coverGradient: 'from-rose-900 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782275034508-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_12
   },
   {
     id: 'ow_13',
@@ -200,7 +232,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Principes démocratiques, séparation des pouvoirs, contrôle de constitutionnalité et régimes comparés.',
     empruntable: true,
     coverGradient: 'from-red-950 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782275089104-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_13
   },
   {
     id: 'ow_14',
@@ -215,7 +247,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Avantage concurrentiel, chaîne de valeur, forces de la concurrence et positionnement stratégique.',
     empruntable: true,
     coverGradient: 'from-emerald-900 to-teal-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782100808380-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_14
   },
   {
     id: 'ow_15',
@@ -230,7 +262,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Panorama des guerres mondiales, de la guerre froide, des mutations sociétales et de l\'effondrement des empires.',
     empruntable: true,
     coverGradient: 'from-yellow-900 to-stone-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782870275801-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_15
   },
   {
     id: 'ow_16',
@@ -245,7 +277,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Structure cellulaire, réplication génétique, transcription, transduction du signal et biologie cellulaire avancée.',
     empruntable: true,
     coverGradient: 'from-lime-900 to-emerald-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782257204300-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_16
   },
   {
     id: 'ow_17',
@@ -260,7 +292,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Liaisons chimiques, cinétique, thermochimie, équilibres acido-basiques et oxydoréduction.',
     empruntable: true,
     coverGradient: 'from-green-900 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782100824007-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_17
   },
   {
     id: 'ow_18',
@@ -275,7 +307,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Critères de falsifiabilité, méthode scientifique, démarcation et théorie de la connaissance objective.',
     empruntable: true,
     coverGradient: 'from-stone-800 to-neutral-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782228880107-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_18
   },
   {
     id: 'ow_19',
@@ -290,7 +322,7 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'La référence normative absolue pour la syntaxe, la morphologie et le lexique français.',
     empruntable: true,
     coverGradient: 'from-cyan-950 to-slate-900',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782801116661-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_19
   },
   {
     id: 'ow_20',
@@ -305,221 +337,611 @@ export const INITIAL_OUVRAGES: Ouvrage[] = [
     resume: 'Description détaillée de l\'organisation du corps humain, systèmes cardiovasculaire, nerveux et musculaire.',
     empruntable: true,
     coverGradient: 'from-rose-950 to-pink-950',
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9782761369305-L.jpg'
+    coverUrl: LOCAL_COVERS_MAP.ow_20
   }
 ];
 
 export const INITIAL_EXEMPLAIRES: Exemplaire[] = [
-  // Clean Code (ow_1) : 3 exemplaires
-  { id: 'ex_101', ouvrageId: 'ow_1', codeQR: 'EX-1001', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T1', rangee: 'R2' } },
-  { id: 'ex_102', ouvrageId: 'ow_1', codeQR: 'EX-1002', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T1', rangee: 'R2' } },
-  { id: 'ex_103', ouvrageId: 'ow_1', codeQR: 'EX-1003', etat: 'bon', statut: 'EMPRUNTE', emplacement: { tiroir: 'T1', rangee: 'R2' } },
-
-  // CLRS (ow_2) : 2 exemplaires (1 emprunté en retard, 1 disponible)
-  { id: 'ex_201', ouvrageId: 'ow_2', codeQR: 'EX-2001', etat: 'bon', statut: 'EMPRUNTE', emplacement: { tiroir: 'T2', rangee: 'R1' } },
-  { id: 'ex_202', ouvrageId: 'ow_2', codeQR: 'EX-2002', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R1' } },
-
-  // Dictionnaire Encyclopédique (ow_3 - consultation sur place uniquement)
-  { id: 'ex_301', ouvrageId: 'ow_3', codeQR: 'EX-3001', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R3' } },
-  { id: 'ex_302', ouvrageId: 'ow_3', codeQR: 'EX-3002', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R3' } },
-
-  // Sapiens (ow_4) : 2 exemplaires (1 emprunté, 1 dispo)
-  { id: 'ex_401', ouvrageId: 'ow_4', codeQR: 'EX-4001', etat: 'bon', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R1' } },
-  { id: 'ex_402', ouvrageId: 'ow_4', codeQR: 'EX-4002', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R1' } },
-
-  // Principes d'Économie (ow_5) : 2 exemplaires
-  { id: 'ex_501', ouvrageId: 'ow_5', codeQR: 'EX-5001', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R3' } },
-  { id: 'ex_502', ouvrageId: 'ow_5', codeQR: 'EX-5002', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R3' } },
-
-  // Mathématiques pour la Licence (ow_6) : 2 exemplaires (dont 1 en réparation pour tester la vie physique)
-  { id: 'ex_601', ouvrageId: 'ow_6', codeQR: 'EX-6001', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T1', rangee: 'R1' } },
-  { id: 'ex_602', ouvrageId: 'ow_6', codeQR: 'EX-6002', etat: 'abîmé', statut: 'EN_REPARATION', emplacement: { tiroir: 'T1', rangee: 'R1' } },
-
-  // Génie Logiciel (ow_7) : 1 seul exemplaire physique, emprunté pour tester la file d'attente de 3 personnes
-  { id: 'ex_701', ouvrageId: 'ow_7', codeQR: 'EX-7001', etat: 'bon', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R2' } },
-
-  // Conception POO (ow_8) : 2 exemplaires
-  { id: 'ex_801', ouvrageId: 'ow_8', codeQR: 'EX-8001', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R3' } },
-  { id: 'ex_802', ouvrageId: 'ow_8', codeQR: 'EX-8002', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R3' } },
-
-  // Réseaux Informatiques (ow_9) : 2 exemplaires
-  { id: 'ex_901', ouvrageId: 'ow_9', codeQR: 'EX-9001', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R4' } },
-  { id: 'ex_902', ouvrageId: 'ow_9', codeQR: 'EX-9002', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R4' } },
-
-  // Physique Générale (ow_10) : 2 exemplaires
-  { id: 'ex_1001', ouvrageId: 'ow_10', codeQR: 'EX-1011', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R1' } },
-  { id: 'ex_1002', ouvrageId: 'ow_10', codeQR: 'EX-1012', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R1' } },
-
-  // Électromagnétisme (ow_11) : 2 exemplaires
-  { id: 'ex_1101', ouvrageId: 'ow_11', codeQR: 'EX-1101', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R2' } },
-  { id: 'ex_1102', ouvrageId: 'ow_11', codeQR: 'EX-1102', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R2' } },
-
-  // Traité de Droit Civil (ow_12) : 2 exemplaires
-  { id: 'ex_1201', ouvrageId: 'ow_12', codeQR: 'EX-1201', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R1' } },
-  { id: 'ex_1202', ouvrageId: 'ow_12', codeQR: 'EX-1202', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R1' } },
-
-  // Droit Constitutionnel (ow_13) : 2 exemplaires
-  { id: 'ex_1301', ouvrageId: 'ow_13', codeQR: 'EX-1301', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R2' } },
-  { id: 'ex_1302', ouvrageId: 'ow_13', codeQR: 'EX-1302', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R2' } },
-
-  // Management Stratégique (ow_14) : 2 exemplaires
-  { id: 'ex_1401', ouvrageId: 'ow_14', codeQR: 'EX-1401', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R4' } },
-  { id: 'ex_1402', ouvrageId: 'ow_14', codeQR: 'EX-1402', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R4' } },
-
-  // Histoire XXe Siècle (ow_15) : 2 exemplaires
-  { id: 'ex_1501', ouvrageId: 'ow_15', codeQR: 'EX-1501', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R3' } },
-  { id: 'ex_1502', ouvrageId: 'ow_15', codeQR: 'EX-1502', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R3' } },
-
-  // Biologie Cellulaire (ow_16) : 2 exemplaires
-  { id: 'ex_1601', ouvrageId: 'ow_16', codeQR: 'EX-1601', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R1' } },
-  { id: 'ex_1602', ouvrageId: 'ow_16', codeQR: 'EX-1602', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R1' } },
-
-  // Chimie Générale (ow_17) : 2 exemplaires
-  { id: 'ex_1701', ouvrageId: 'ow_17', codeQR: 'EX-1701', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R2' } },
-  { id: 'ex_1702', ouvrageId: 'ow_17', codeQR: 'EX-1702', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R2' } },
-
-  // Philosophie des Sciences (ow_18) : 2 exemplaires
-  { id: 'ex_1801', ouvrageId: 'ow_18', codeQR: 'EX-1801', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R3' } },
-  { id: 'ex_1802', ouvrageId: 'ow_18', codeQR: 'EX-1802', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R3' } },
-
-  // Le Bon Usage (ow_19) : 2 exemplaires
-  { id: 'ex_1901', ouvrageId: 'ow_19', codeQR: 'EX-1901', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R4' } },
-  { id: 'ex_1902', ouvrageId: 'ow_19', codeQR: 'EX-1902', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R4' } },
-
-  // Anatomie et Physiologie (ow_20) : 2 exemplaires
-  { id: 'ex_2001', ouvrageId: 'ow_20', codeQR: 'EX-2011', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R4' } },
-  { id: 'ex_2002', ouvrageId: 'ow_20', codeQR: 'EX-2012', etat: 'bon', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R4' } }
+  { id: 'ex_101', ouvrageId: 'ow_1', codeQR: 'EX-1001', statut: 'DISPONIBLE', emplacement: { tiroir: 'T1', rangee: 'R2' } },
+  { id: 'ex_102', ouvrageId: 'ow_1', codeQR: 'EX-1002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T1', rangee: 'R2' } },
+  { id: 'ex_103', ouvrageId: 'ow_1', codeQR: 'EX-1003', statut: 'EMPRUNTE', emplacement: { tiroir: 'T1', rangee: 'R2' } },
+  { id: 'ex_201', ouvrageId: 'ow_2', codeQR: 'EX-2001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T2', rangee: 'R1' } },
+  { id: 'ex_202', ouvrageId: 'ow_2', codeQR: 'EX-2002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R1' } },
+  { id: 'ex_301', ouvrageId: 'ow_3', codeQR: 'EX-3001', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R3' } },
+  { id: 'ex_302', ouvrageId: 'ow_3', codeQR: 'EX-3002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R3' } },
+  { id: 'ex_401', ouvrageId: 'ow_4', codeQR: 'EX-4001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R1' } },
+  { id: 'ex_402', ouvrageId: 'ow_4', codeQR: 'EX-4002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R1' } },
+  { id: 'ex_501', ouvrageId: 'ow_5', codeQR: 'EX-5001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T2', rangee: 'R3' } },
+  { id: 'ex_502', ouvrageId: 'ow_5', codeQR: 'EX-5002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R3' } },
+  { id: 'ex_601', ouvrageId: 'ow_6', codeQR: 'EX-6001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T1', rangee: 'R1' } },
+  { id: 'ex_602', ouvrageId: 'ow_6', codeQR: 'EX-6002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T1', rangee: 'R1' } },
+  { id: 'ex_701', ouvrageId: 'ow_7', codeQR: 'EX-7001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R2' } },
+  { id: 'ex_702', ouvrageId: 'ow_7', codeQR: 'EX-7002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R2' } },
+  { id: 'ex_801', ouvrageId: 'ow_8', codeQR: 'EX-8001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R3' } },
+  { id: 'ex_802', ouvrageId: 'ow_8', codeQR: 'EX-8002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R3' } },
+  { id: 'ex_901', ouvrageId: 'ow_9', codeQR: 'EX-9001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R4' } },
+  { id: 'ex_902', ouvrageId: 'ow_9', codeQR: 'EX-9002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R4' } },
+  { id: 'ex_1001', ouvrageId: 'ow_10', codeQR: 'EX-1011', statut: 'EMPRUNTE', emplacement: { tiroir: 'T4', rangee: 'R1' } },
+  { id: 'ex_1002', ouvrageId: 'ow_10', codeQR: 'EX-1012', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R1' } },
+  { id: 'ex_1101', ouvrageId: 'ow_11', codeQR: 'EX-1101', statut: 'EMPRUNTE', emplacement: { tiroir: 'T4', rangee: 'R2' } },
+  { id: 'ex_1102', ouvrageId: 'ow_11', codeQR: 'EX-1102', statut: 'DISPONIBLE', emplacement: { tiroir: 'T4', rangee: 'R2' } },
+  { id: 'ex_1201', ouvrageId: 'ow_12', codeQR: 'EX-1201', statut: 'EMPRUNTE', emplacement: { tiroir: 'T5', rangee: 'R1' } },
+  { id: 'ex_1202', ouvrageId: 'ow_12', codeQR: 'EX-1202', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R1' } },
+  { id: 'ex_1301', ouvrageId: 'ow_13', codeQR: 'EX-1301', statut: 'EMPRUNTE', emplacement: { tiroir: 'T5', rangee: 'R2' } },
+  { id: 'ex_1302', ouvrageId: 'ow_13', codeQR: 'EX-1302', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R2' } },
+  { id: 'ex_1401', ouvrageId: 'ow_14', codeQR: 'EX-1401', statut: 'EMPRUNTE', emplacement: { tiroir: 'T2', rangee: 'R4' } },
+  { id: 'ex_1402', ouvrageId: 'ow_14', codeQR: 'EX-1402', statut: 'DISPONIBLE', emplacement: { tiroir: 'T2', rangee: 'R4' } },
+  { id: 'ex_1501', ouvrageId: 'ow_15', codeQR: 'EX-1501', statut: 'EMPRUNTE', emplacement: { tiroir: 'T5', rangee: 'R3' } },
+  { id: 'ex_1502', ouvrageId: 'ow_15', codeQR: 'EX-1502', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R3' } },
+  { id: 'ex_1601', ouvrageId: 'ow_16', codeQR: 'EX-1601', statut: 'EMPRUNTE', emplacement: { tiroir: 'T6', rangee: 'R1' } },
+  { id: 'ex_1602', ouvrageId: 'ow_16', codeQR: 'EX-1602', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R1' } },
+  { id: 'ex_1701', ouvrageId: 'ow_17', codeQR: 'EX-1701', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R2' } },
+  { id: 'ex_1702', ouvrageId: 'ow_17', codeQR: 'EX-1702', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R2' } },
+  { id: 'ex_1801', ouvrageId: 'ow_18', codeQR: 'EX-1801', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R3' } },
+  { id: 'ex_1802', ouvrageId: 'ow_18', codeQR: 'EX-1802', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R3' } },
+  { id: 'ex_1901', ouvrageId: 'ow_19', codeQR: 'EX-1901', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R4' } },
+  { id: 'ex_1902', ouvrageId: 'ow_19', codeQR: 'EX-1902', statut: 'DISPONIBLE', emplacement: { tiroir: 'T6', rangee: 'R4' } },
+  { id: 'ex_2001', ouvrageId: 'ow_20', codeQR: 'EX-2011', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R4' } },
+  { id: 'ex_2002', ouvrageId: 'ow_20', codeQR: 'EX-2012', statut: 'DISPONIBLE', emplacement: { tiroir: 'T5', rangee: 'R4' } }
 ];
 
-// Exactement 30 étudiants universitaires avec e-mails académiques fictifs (@usmba.ac.ma)
 export const INITIAL_ADHERENTS: Adherent[] = [
-  { id: 'adh_1', numeroEtudiant: 'ETU-2026-0001', nom: 'Benali', prenom: 'Karim', emailAcademique: 'karim.benali@usmba.ac.ma', codeQR: 'ETU-2026-0001', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_2', numeroEtudiant: 'ETU-2026-0002', nom: 'El Idrissi', prenom: 'Fatima Zahra', emailAcademique: 'fatimazahra.elidrissi@usmba.ac.ma', codeQR: 'ETU-2026-0002', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_3', numeroEtudiant: 'ETU-2026-0003', nom: 'Alami', prenom: 'Mehdi', emailAcademique: 'mehdi.alami@usmba.ac.ma', codeQR: 'ETU-2026-0003', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_4', numeroEtudiant: 'ETU-2026-0004', nom: 'Bennani', prenom: 'Salma', emailAcademique: 'salma.bennani@usmba.ac.ma', codeQR: 'ETU-2026-0004', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_5', numeroEtudiant: 'ETU-2026-0005', nom: 'Chraibi', prenom: 'Amine', emailAcademique: 'amine.chraibi@usmba.ac.ma', codeQR: 'ETU-2026-0005', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_6', numeroEtudiant: 'ETU-2026-0006', nom: 'Tahiri', prenom: 'Yassine', emailAcademique: 'yassine.tahiri@usmba.ac.ma', codeQR: 'ETU-2026-0006', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_7', numeroEtudiant: 'ETU-2026-0007', nom: 'Ziani', prenom: 'Imane', emailAcademique: 'imane.ziani@usmba.ac.ma', codeQR: 'ETU-2026-0007', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_8', numeroEtudiant: 'ETU-2026-0008', nom: 'El Fassi', prenom: 'Omar', emailAcademique: 'omar.elfassi@usmba.ac.ma', codeQR: 'ETU-2026-0008', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_9', numeroEtudiant: 'ETU-2026-0009', nom: 'Ouazzani', prenom: 'Hiba', emailAcademique: 'hiba.ouazzani@usmba.ac.ma', codeQR: 'ETU-2026-0009', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_10', numeroEtudiant: 'ETU-2026-0010', nom: 'Mansouri', prenom: 'Hamza', emailAcademique: 'hamza.mansouri@usmba.ac.ma', codeQR: 'ETU-2026-0010', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_11', numeroEtudiant: 'ETU-2026-0011', nom: 'Slaoui', prenom: 'Kawtar', emailAcademique: 'kawtar.slaoui@usmba.ac.ma', codeQR: 'ETU-2026-0011', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_12', numeroEtudiant: 'ETU-2026-0012', nom: 'Berrada', prenom: 'Anas', emailAcademique: 'anas.berrada@usmba.ac.ma', codeQR: 'ETU-2026-0012', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_13', numeroEtudiant: 'ETU-2026-0013', nom: 'Kabbaj', prenom: 'Sara', emailAcademique: 'sara.kabbaj@usmba.ac.ma', codeQR: 'ETU-2026-0013', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_14', numeroEtudiant: 'ETU-2026-0014', nom: 'Lahlou', prenom: 'Reda', emailAcademique: 'reda.lahlou@usmba.ac.ma', codeQR: 'ETU-2026-0014', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_15', numeroEtudiant: 'ETU-2026-0015', nom: 'El Amrani', prenom: 'Noura', emailAcademique: 'noura.elamrani@usmba.ac.ma', codeQR: 'ETU-2026-0015', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_16', numeroEtudiant: 'ETU-2026-0016', nom: 'Filali', prenom: 'Ayoub', emailAcademique: 'ayoub.filali@usmba.ac.ma', codeQR: 'ETU-2026-0016', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_17', numeroEtudiant: 'ETU-2026-0017', nom: 'Tazi', prenom: 'Manal', emailAcademique: 'manal.tazi@usmba.ac.ma', codeQR: 'ETU-2026-0017', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_18', numeroEtudiant: 'ETU-2026-0018', nom: 'Kadiri', prenom: 'Othmane', emailAcademique: 'othmane.kadiri@usmba.ac.ma', codeQR: 'ETU-2026-0018', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_19', numeroEtudiant: 'ETU-2026-0019', nom: 'Alaoui', prenom: 'Siham', emailAcademique: 'siham.alaoui@usmba.ac.ma', codeQR: 'ETU-2026-0019', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_20', numeroEtudiant: 'ETU-2026-0020', nom: 'Bennis', prenom: 'Zakaria', emailAcademique: 'zakaria.bennis@usmba.ac.ma', codeQR: 'ETU-2026-0020', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_21', numeroEtudiant: 'ETU-2026-0021', nom: 'Lamrani', prenom: 'Khadija', emailAcademique: 'khadija.lamrani@usmba.ac.ma', codeQR: 'ETU-2026-0021', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_22', numeroEtudiant: 'ETU-2026-0022', nom: 'Mekouar', prenom: 'Tariq', emailAcademique: 'tariq.mekouar@usmba.ac.ma', codeQR: 'ETU-2026-0022', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_23', numeroEtudiant: 'ETU-2026-0023', nom: 'Sebti', prenom: 'Rim', emailAcademique: 'rim.sebti@usmba.ac.ma', codeQR: 'ETU-2026-0023', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_24', numeroEtudiant: 'ETU-2026-0024', nom: 'Ghannam', prenom: 'Houssam', emailAcademique: 'houssam.ghannam@usmba.ac.ma', codeQR: 'ETU-2026-0024', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_25', numeroEtudiant: 'ETU-2026-0025', nom: 'Touimi', prenom: 'Soukaina', emailAcademique: 'soukaina.touimi@usmba.ac.ma', codeQR: 'ETU-2026-0025', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_26', numeroEtudiant: 'ETU-2026-0026', nom: 'El Ouazzani', prenom: 'Bilal', emailAcademique: 'bilal.elouazzani@usmba.ac.ma', codeQR: 'ETU-2026-0026', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_27', numeroEtudiant: 'ETU-2026-0027', nom: 'Belkadi', prenom: 'Meriem', emailAcademique: 'meriem.belkadi@usmba.ac.ma', codeQR: 'ETU-2026-0027', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_28', numeroEtudiant: 'ETU-2026-0028', nom: 'Cherkaoui', prenom: 'Saad', emailAcademique: 'saad.cherkaoui@usmba.ac.ma', codeQR: 'ETU-2026-0028', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_29', numeroEtudiant: 'ETU-2026-0029', nom: 'Benjelloun', prenom: 'Asmaa', emailAcademique: 'asmaa.benjelloun@usmba.ac.ma', codeQR: 'ETU-2026-0029', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_30', numeroEtudiant: 'ETU-2026-0030', nom: 'El Khatib', prenom: 'Walid', emailAcademique: 'walid.elkhatib@usmba.ac.ma', codeQR: 'ETU-2026-0030', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' }
+  // 3 résiliés (ETU-001 à ETU-003)
+  { id: 'adh_001', numeroEtudiant: 'ETU-001', nom: 'Benali', prenom: 'Youssef', emailAcademique: 'youssef.benali@usmba.ac.ma', filiere: 'Informatique', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'resilie' },
+  { id: 'adh_002', numeroEtudiant: 'ETU-002', nom: 'El Idrissi', prenom: 'Salma', emailAcademique: 'ifogojunior168+etu002@gmail.com', filiere: 'Droit', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'resilie' },
+  { id: 'adh_003', numeroEtudiant: 'ETU-003', nom: 'Alami', prenom: 'Karim', emailAcademique: 'karim.alami@usmba.ac.ma', filiere: 'Économie', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'resilie' },
+
+  // 1 abonnement expiré (ETU-004)
+  { id: 'adh_004', numeroEtudiant: 'ETU-004', nom: 'Bennani', prenom: 'Nadia', emailAcademique: 'ifogojunior168+etu004@gmail.com', filiere: 'Biologie', niveau: 'M1', dateInscription: '2025-09-01', dateExpiration: getRelativeDate(-45), statut: 'actif' },
+
+  // 8 avec emprunt en cours dans les délais (ETU-005 à ETU-012)
+  { id: 'adh_005', numeroEtudiant: 'ETU-005', nom: 'Chraibi', prenom: 'Amine', emailAcademique: 'ifogojunior168+etu005@gmail.com', filiere: 'Informatique', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_006', numeroEtudiant: 'ETU-006', nom: 'Tahiri', prenom: 'Imane', emailAcademique: 'ifogojunior168+etu006@gmail.com', filiere: 'Informatique', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_007', numeroEtudiant: 'ETU-007', nom: 'Ziani', prenom: 'Mehdi', emailAcademique: 'ifogojunior168+etu007@gmail.com', filiere: 'Histoire', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_008', numeroEtudiant: 'ETU-008', nom: 'El Fassi', prenom: 'Hiba', emailAcademique: 'ifogojunior168+etu008@gmail.com', filiere: 'Économie', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_009', numeroEtudiant: 'ETU-009', nom: 'Ouazzani', prenom: 'Hamza', emailAcademique: 'ifogojunior168+etu009@gmail.com', filiere: 'Mathématiques', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_010', numeroEtudiant: 'ETU-010', nom: 'Mansouri', prenom: 'Kawtar', emailAcademique: 'ifogojunior168+etu010@gmail.com', filiere: 'Informatique', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_011', numeroEtudiant: 'ETU-011', nom: 'Slaoui', prenom: 'Anas', emailAcademique: 'ifogojunior168+etu011@gmail.com', filiere: 'Informatique', niveau: 'M2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_012', numeroEtudiant: 'ETU-012', nom: 'Berrada', prenom: 'Sara', emailAcademique: 'ifogojunior168+etu012@gmail.com', filiere: 'Informatique', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+
+  // 3 en retard de 1 à 4 jours (dont 2 à exactement J+2) (ETU-013 à ETU-015)
+  { id: 'adh_013', numeroEtudiant: 'ETU-013', nom: 'Kabbaj', prenom: 'Reda', emailAcademique: 'ifogojunior168+etu013@gmail.com', filiere: 'Physique', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_014', numeroEtudiant: 'ETU-014', nom: 'Lahlou', prenom: 'Noura', emailAcademique: 'ifogojunior168+etu014@gmail.com', filiere: 'Physique', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_015', numeroEtudiant: 'ETU-015', nom: 'El Amrani', prenom: 'Ayoub', emailAcademique: 'ifogojunior168+etu015@gmail.com', filiere: 'Droit', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+
+  // 2 en retard de 5 à 7 jours (ETU-016 à ETU-017)
+  { id: 'adh_016', numeroEtudiant: 'ETU-016', nom: 'Filali', prenom: 'Manal', emailAcademique: 'ifogojunior168+etu016@gmail.com', filiere: 'Droit', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_017', numeroEtudiant: 'ETU-017', nom: 'Tazi', prenom: 'Othmane', emailAcademique: 'ifogojunior168+etu017@gmail.com', filiere: 'Économie', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+
+  // 2 en retard de 8 jours ou plus (ETU-018, ETU-019)
+  { id: 'adh_018', numeroEtudiant: 'ETU-018', nom: 'Kadiri', prenom: 'Siham', emailAcademique: 'ifogojunior168+etu018@gmail.com', filiere: 'Histoire', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_019', numeroEtudiant: 'ETU-019', nom: 'Alaoui', prenom: 'Zakaria', emailAcademique: 'ifogojunior168+etu019@gmail.com', filiere: 'Biologie', niveau: 'M2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+
+  // 6 avec un historique d'emprunts rendus (ETU-020 à ETU-025)
+  { id: 'adh_020', numeroEtudiant: 'ETU-020', nom: 'Bennis', prenom: 'Khadija', emailAcademique: 'khadija.bennis@usmba.ac.ma', filiere: 'Chimie', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_021', numeroEtudiant: 'ETU-021', nom: 'Lamrani', prenom: 'Tariq', emailAcademique: 'ifogojunior168+etu021@gmail.com', filiere: 'Physique', niveau: 'M2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_022', numeroEtudiant: 'ETU-022', nom: 'Mekouar', prenom: 'Rim', emailAcademique: 'rim.mekouar@usmba.ac.ma', filiere: 'Histoire', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_023', numeroEtudiant: 'ETU-023', nom: 'Sebti', prenom: 'Houssam', emailAcademique: 'ifogojunior168+etu023@gmail.com', filiere: 'Biologie', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_024', numeroEtudiant: 'ETU-024', nom: 'Ghannam', prenom: 'Soukaina', emailAcademique: 'soukaina.ghannam@usmba.ac.ma', filiere: 'Informatique', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_025', numeroEtudiant: 'ETU-025', nom: 'Touimi', prenom: 'Bilal', emailAcademique: 'ifogojunior168+etu025@gmail.com', filiere: 'Mathématiques', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+
+  // 15 actifs sans emprunt (ETU-026 à ETU-040)
+  { id: 'adh_026', numeroEtudiant: 'ETU-026', nom: 'Belkadi', prenom: 'Meriem', emailAcademique: 'meriem.belkadi@usmba.ac.ma', filiere: 'Chimie', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_027', numeroEtudiant: 'ETU-027', nom: 'Cherkaoui', prenom: 'Saad', emailAcademique: 'ifogojunior168+etu027@gmail.com', filiere: 'Mathématiques', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_028', numeroEtudiant: 'ETU-028', nom: 'Benjelloun', prenom: 'Asmaa', emailAcademique: 'asmaa.benjelloun@usmba.ac.ma', filiere: 'Biologie', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_029', numeroEtudiant: 'ETU-029', nom: 'El Khatib', prenom: 'Walid', emailAcademique: 'ifogojunior168+etu029@gmail.com', filiere: 'Droit', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_030', numeroEtudiant: 'ETU-030', nom: 'Kettani', prenom: 'Zineb', emailAcademique: 'zineb.kettani@usmba.ac.ma', filiere: 'Économie', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_031', numeroEtudiant: 'ETU-031', nom: 'Naciri', prenom: 'Soufiane', emailAcademique: 'ifogojunior168+etu031@gmail.com', filiere: 'Chimie', niveau: 'L3', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_032', numeroEtudiant: 'ETU-032', nom: 'Bouazzaoui', prenom: 'Houda', emailAcademique: 'houda.bouazzaoui@usmba.ac.ma', filiere: 'Histoire', niveau: 'M2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_033', numeroEtudiant: 'ETU-033', nom: 'Skalli', prenom: 'Marouane', emailAcademique: 'ifogojunior168+etu033@gmail.com', filiere: 'Physique', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_034', numeroEtudiant: 'ETU-034', nom: 'Benbrahim', prenom: 'Chaimae', emailAcademique: 'chaimae.benbrahim@usmba.ac.ma', filiere: 'Informatique', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_035', numeroEtudiant: 'ETU-035', nom: 'El Guermai', prenom: 'Adil', emailAcademique: 'ifogojunior168+etu035@gmail.com', filiere: 'Mathématiques', niveau: 'M2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_036', numeroEtudiant: 'ETU-036', nom: 'Berradaoui', prenom: 'Ghita', emailAcademique: 'ghita.berradaoui@usmba.ac.ma', filiere: 'Biologie', niveau: 'L2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_037', numeroEtudiant: 'ETU-037', nom: 'Moutawakil', prenom: 'Ilyas', emailAcademique: 'ifogojunior168+etu037@gmail.com', filiere: 'Chimie', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_038', numeroEtudiant: 'ETU-038', nom: 'Benomar', prenom: 'Loubna', emailAcademique: 'loubna.benomar@usmba.ac.ma', filiere: 'Droit', niveau: 'M2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_039', numeroEtudiant: 'ETU-039', nom: 'El Hachimi', prenom: 'Rachid', emailAcademique: 'ifogojunior168+etu039@gmail.com', filiere: 'Économie', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_040', numeroEtudiant: 'ETU-040', nom: 'Boukhari', prenom: 'Samira', emailAcademique: 'samira.boukhari@usmba.ac.ma', filiere: 'Histoire', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' }
 ];
 
 export const INITIAL_EMPRUNTS: Emprunt[] = [
-  // 1 emprunt initialement en retard de 1 jour (J+1 après échéance) :
-  // A J+2 après échéance (+1 jour simulé) -> 1er rappel envoyé
-  // A J+4 après échéance (+3 jours simulés) -> 2e rappel envoyé et passe « à contacter »
+  // 8 emprunts en cours dans les délais (dateRetourPrevue = dateEmprunt + 15 jours)
   {
-    id: 'emp_1',
-    loanNumber: 'PRT-2026-0041',
-    adherentId: 'adh_1', // Karim Benali
-    exemplaireId: 'ex_201', // CLRS
-    ouvrageId: 'ow_2',
-    dateEmprunt: getRelativeDate(-16),
-    dateRetourPrevue: getRelativeDate(-1), // En retard de 1 jour dès le départ
-    nbRappels: 0,
-    statut: 'en_cours',
-    notes: 'Préparation partiel d\'algorithmique fondamentale'
-  },
-  // Emprunts en cours normaux
-  {
-    id: 'emp_2',
-    loanNumber: 'PRT-2026-0042',
-    adherentId: 'adh_3', // Mehdi Alami
-    exemplaireId: 'ex_103', // Clean Code
+    id: 'emp_001',
+    loanNumber: 'PRT-2026-0001',
+    adherentId: 'adh_005',
+    exemplaireId: 'ex_103',
     ouvrageId: 'ow_1',
-    dateEmprunt: getRelativeDate(-8),
-    dateRetourPrevue: getRelativeDate(7),
+    dateEmprunt: getRelativeDate(-2),
+    dateRetourPrevue: getRelativeDate(13),
     nbRappels: 0,
     statut: 'en_cours'
   },
   {
-    id: 'emp_3',
-    loanNumber: 'PRT-2026-0043',
-    adherentId: 'adh_2', // Fatima Zahra El Idrissi
-    exemplaireId: 'ex_401', // Sapiens
+    id: 'emp_002',
+    loanNumber: 'PRT-2026-0002',
+    adherentId: 'adh_006',
+    exemplaireId: 'ex_201',
+    ouvrageId: 'ow_2',
+    dateEmprunt: getRelativeDate(-4),
+    dateRetourPrevue: getRelativeDate(11),
+    nbRappels: 0,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_003',
+    loanNumber: 'PRT-2026-0003',
+    adherentId: 'adh_007',
+    exemplaireId: 'ex_401',
     ouvrageId: 'ow_4',
     dateEmprunt: getRelativeDate(-5),
     dateRetourPrevue: getRelativeDate(10),
     nbRappels: 0,
     statut: 'en_cours'
   },
-  // ow_7 emprunté par Karim Benali : bloque l'unique exemplaire et crée la file d'attente
   {
-    id: 'emp_701',
-    loanNumber: 'PRT-2026-0046',
-    adherentId: 'adh_1', // Karim Benali
-    exemplaireId: 'ex_701', // Génie Logiciel (EX-7001)
-    ouvrageId: 'ow_7',
+    id: 'emp_004',
+    loanNumber: 'PRT-2026-0004',
+    adherentId: 'adh_008',
+    exemplaireId: 'ex_501',
+    ouvrageId: 'ow_5',
     dateEmprunt: getRelativeDate(-6),
     dateRetourPrevue: getRelativeDate(9),
     nbRappels: 0,
-    statut: 'en_cours',
-    notes: 'Prêt actif avec file d\'attente prioritaire'
+    statut: 'en_cours'
   },
-  // Emprunt historique restitué
   {
-    id: 'emp_5',
-    loanNumber: 'PRT-2026-0038',
-    adherentId: 'adh_4', // Salma Bennani
-    exemplaireId: 'ex_501', // Principes d'Économie
-    ouvrageId: 'ow_5',
+    id: 'emp_005',
+    loanNumber: 'PRT-2026-0005',
+    adherentId: 'adh_009',
+    exemplaireId: 'ex_601',
+    ouvrageId: 'ow_6',
+    dateEmprunt: getRelativeDate(-8),
+    dateRetourPrevue: getRelativeDate(7),
+    nbRappels: 0,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_006',
+    loanNumber: 'PRT-2026-0006',
+    adherentId: 'adh_010',
+    exemplaireId: 'ex_701',
+    ouvrageId: 'ow_7',
+    dateEmprunt: getRelativeDate(-9),
+    dateRetourPrevue: getRelativeDate(6),
+    nbRappels: 0,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_007',
+    loanNumber: 'PRT-2026-0007',
+    adherentId: 'adh_011',
+    exemplaireId: 'ex_801',
+    ouvrageId: 'ow_8',
+    dateEmprunt: getRelativeDate(-11),
+    dateRetourPrevue: getRelativeDate(4),
+    nbRappels: 0,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_008',
+    loanNumber: 'PRT-2026-0008',
+    adherentId: 'adh_012',
+    exemplaireId: 'ex_901',
+    ouvrageId: 'ow_9',
+    dateEmprunt: getRelativeDate(-13),
+    dateRetourPrevue: getRelativeDate(2),
+    nbRappels: 0,
+    statut: 'en_cours'
+  },
+
+  // 3 en retard de 1 à 4 jours (dont 2 à exactement J+2)
+  {
+    id: 'emp_009',
+    loanNumber: 'PRT-2026-0009',
+    adherentId: 'adh_013',
+    exemplaireId: 'ex_1001',
+    ouvrageId: 'ow_10',
+    dateEmprunt: getRelativeDate(-16),
+    dateRetourPrevue: getRelativeDate(-1),
+    nbRappels: 1,
+    dateDernierRappel: getRelativeDate(0),
+    dernierNiveauMessage: 'J+1',
+    dernierJourRetardMessage: 1,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_010',
+    loanNumber: 'PRT-2026-0010',
+    adherentId: 'adh_014',
+    exemplaireId: 'ex_1101',
+    ouvrageId: 'ow_11',
+    dateEmprunt: getRelativeDate(-17),
+    dateRetourPrevue: getRelativeDate(-2),
+    nbRappels: 2,
+    dateDernierRappel: getRelativeDate(0),
+    dernierNiveauMessage: 'J+2',
+    dernierJourRetardMessage: 2,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_011',
+    loanNumber: 'PRT-2026-0011',
+    adherentId: 'adh_015',
+    exemplaireId: 'ex_1201',
+    ouvrageId: 'ow_12',
+    dateEmprunt: getRelativeDate(-17),
+    dateRetourPrevue: getRelativeDate(-2),
+    nbRappels: 2,
+    dateDernierRappel: getRelativeDate(0),
+    dernierNiveauMessage: 'J+2',
+    dernierJourRetardMessage: 2,
+    statut: 'en_cours'
+  },
+
+  // 2 en retard de 5 à 7 jours
+  {
+    id: 'emp_012',
+    loanNumber: 'PRT-2026-0012',
+    adherentId: 'adh_016',
+    exemplaireId: 'ex_1301',
+    ouvrageId: 'ow_13',
+    dateEmprunt: getRelativeDate(-20),
+    dateRetourPrevue: getRelativeDate(-5),
+    nbRappels: 2,
+    dateDernierRappel: getRelativeDate(-3),
+    dernierNiveauMessage: 'J+2',
+    dernierJourRetardMessage: 2,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_013',
+    loanNumber: 'PRT-2026-0013',
+    adherentId: 'adh_017',
+    exemplaireId: 'ex_1401',
+    ouvrageId: 'ow_14',
+    dateEmprunt: getRelativeDate(-22),
+    dateRetourPrevue: getRelativeDate(-7),
+    nbRappels: 2,
+    dateDernierRappel: getRelativeDate(-5),
+    dernierNiveauMessage: 'J+2',
+    dernierJourRetardMessage: 2,
+    statut: 'en_cours'
+  },
+
+  // 2 en retard de 8 jours ou plus
+  {
+    id: 'emp_014',
+    loanNumber: 'PRT-2026-0014',
+    adherentId: 'adh_018',
+    exemplaireId: 'ex_1501',
+    ouvrageId: 'ow_15',
+    dateEmprunt: getRelativeDate(-23),
+    dateRetourPrevue: getRelativeDate(-8),
+    nbRappels: 2,
+    dateDernierRappel: getRelativeDate(-6),
+    dernierNiveauMessage: 'J+2',
+    dernierJourRetardMessage: 2,
+    statut: 'en_cours'
+  },
+  {
+    id: 'emp_015',
+    loanNumber: 'PRT-2026-0015',
+    adherentId: 'adh_019',
+    exemplaireId: 'ex_1601',
+    ouvrageId: 'ow_16',
     dateEmprunt: getRelativeDate(-25),
     dateRetourPrevue: getRelativeDate(-10),
-    dateRetourEffective: getRelativeDate(-11),
+    nbRappels: 1,
+    dateDernierRappel: getRelativeDate(-9),
+    dernierNiveauMessage: 'J+1',
+    dernierJourRetardMessage: 1,
+    statut: 'en_cours'
+  },
+
+  // 6 avec un historique d'emprunts rendus
+  {
+    id: 'emp_016',
+    loanNumber: 'PRT-2026-0016',
+    adherentId: 'adh_020',
+    exemplaireId: 'ex_1701',
+    ouvrageId: 'ow_17',
+    dateEmprunt: getRelativeDate(-30),
+    dateRetourPrevue: getRelativeDate(-15),
+    dateRetourEffective: getRelativeDate(-17),
     nbRappels: 0,
     statut: 'rendu',
-    etatAuRetour: 'bon',
-    notes: 'Rendu en parfait état au guichet'
+    notes: 'Rendu en bon état au guichet'
+  },
+  {
+    id: 'emp_017',
+    loanNumber: 'PRT-2026-0017',
+    adherentId: 'adh_021',
+    exemplaireId: 'ex_1801',
+    ouvrageId: 'ow_18',
+    dateEmprunt: getRelativeDate(-28),
+    dateRetourPrevue: getRelativeDate(-13),
+    dateRetourEffective: getRelativeDate(-14),
+    nbRappels: 0,
+    statut: 'rendu',
+    notes: 'Restitué dans les délais'
+  },
+  {
+    id: 'emp_018',
+    loanNumber: 'PRT-2026-0018',
+    adherentId: 'adh_022',
+    exemplaireId: 'ex_1901',
+    ouvrageId: 'ow_19',
+    dateEmprunt: getRelativeDate(-26),
+    dateRetourPrevue: getRelativeDate(-11),
+    dateRetourEffective: getRelativeDate(-12),
+    nbRappels: 0,
+    statut: 'rendu'
+  },
+  {
+    id: 'emp_019',
+    loanNumber: 'PRT-2026-0019',
+    adherentId: 'adh_023',
+    exemplaireId: 'ex_2001',
+    ouvrageId: 'ow_20',
+    dateEmprunt: getRelativeDate(-24),
+    dateRetourPrevue: getRelativeDate(-9),
+    dateRetourEffective: getRelativeDate(-10),
+    nbRappels: 0,
+    statut: 'rendu'
+  },
+  {
+    id: 'emp_020',
+    loanNumber: 'PRT-2026-0020',
+    adherentId: 'adh_024',
+    exemplaireId: 'ex_101',
+    ouvrageId: 'ow_1',
+    dateEmprunt: getRelativeDate(-22),
+    dateRetourPrevue: getRelativeDate(-7),
+    dateRetourEffective: getRelativeDate(-8),
+    nbRappels: 0,
+    statut: 'rendu'
+  },
+  {
+    id: 'emp_021',
+    loanNumber: 'PRT-2026-0021',
+    adherentId: 'adh_025',
+    exemplaireId: 'ex_202',
+    ouvrageId: 'ow_2',
+    dateEmprunt: getRelativeDate(-20),
+    dateRetourPrevue: getRelativeDate(-5),
+    dateRetourEffective: getRelativeDate(-6),
+    nbRappels: 0,
+    statut: 'rendu'
   }
 ];
 
-// File d'attente de trois personnes sur ow_7 (Génie Logiciel) :
-// Rang 1: Yassine Tahiri (dem_1, -3 jours)
-// Rang 2: Imane Ziani (dem_2, -2 jours)
-// Rang 3: Omar El Fassi (dem_3, -1 jour)
-export const INITIAL_DEMANDES: DemandeAttente[] = [
+export const INITIAL_NOTIFICATIONS: EmailNotification[] = [
   {
-    id: 'dem_1',
-    adherentId: 'adh_6', // Yassine Tahiri (ETU-2026-0006) - Rang 1
-    ouvrageId: 'ow_7',
-    dateInscription: getRelativeDate(-3),
-    statut: 'EN_ATTENTE'
+    id: 'notif_init_013_1',
+    destinataireEmail: 'ifogojunior168+etu013@gmail.com',
+    destinataireNom: 'Reda Kabbaj',
+    destinataireNumero: 'ETU-013',
+    sujet: 'Retour d\'un ouvrage – petit rappel',
+    corps: 'Bonjour Reda, l\'ouvrage « Physique Générale : Mécanique et Thermodynamique » devait être rendu hier. Merci de le rapporter à la bibliothèque lors de votre prochaine visite. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(0),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J1',
+    niveauMessage: 'J+1',
+    joursRetard: 1,
+    empruntId: 'emp_009',
+    ouvrageId: 'ow_10',
+    ouvrageTitre: 'Physique Générale : Mécanique et Thermodynamique',
+    exemplaireId: 'ex_1001',
+    exemplaireCode: 'EX-1011',
+    adherentId: 'adh_013'
   },
   {
-    id: 'dem_2',
-    adherentId: 'adh_7', // Imane Ziani (ETU-2026-0007) - Rang 2
-    ouvrageId: 'ow_7',
-    dateInscription: getRelativeDate(-2),
-    statut: 'EN_ATTENTE'
+    id: 'notif_init_014_1',
+    destinataireEmail: 'ifogojunior168+etu014@gmail.com',
+    destinataireNom: 'Noura Lahlou',
+    destinataireNumero: 'ETU-014',
+    sujet: 'Retour d\'un ouvrage – petit rappel',
+    corps: 'Bonjour Noura, l\'ouvrage « Le Cours de Physique de Feynman : Électromagnétisme 1 » devait être rendu hier. Merci de le rapporter à la bibliothèque. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-1),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J1',
+    niveauMessage: 'J+1',
+    joursRetard: 1,
+    empruntId: 'emp_010',
+    ouvrageId: 'ow_11',
+    ouvrageTitre: 'Le Cours de Physique de Feynman : Électromagnétisme 1',
+    exemplaireId: 'ex_1101',
+    exemplaireCode: 'EX-1101',
+    adherentId: 'adh_014'
   },
   {
-    id: 'dem_3',
-    adherentId: 'adh_8', // Omar El Fassi (ETU-2026-0008) - Rang 3
-    ouvrageId: 'ow_7',
-    dateInscription: getRelativeDate(-1),
-    statut: 'EN_ATTENTE'
+    id: 'notif_init_014_2',
+    destinataireEmail: 'ifogojunior168+etu014@gmail.com',
+    destinataireNom: 'Noura Lahlou',
+    destinataireNumero: 'ETU-014',
+    sujet: 'Rappel – retour d\'un ouvrage de la bibliothèque',
+    corps: 'Bonjour Noura, sauf erreur de notre part, l\'ouvrage « Le Cours de Physique de Feynman : Électromagnétisme 1 » est en retard de 2 jours. Merci de le rapporter dès que possible. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(0),
+    heureEnvoi: '09:15',
+    type: 'MESSAGE_J2',
+    niveauMessage: 'J+2',
+    joursRetard: 2,
+    empruntId: 'emp_010',
+    ouvrageId: 'ow_11',
+    ouvrageTitre: 'Le Cours de Physique de Feynman : Électromagnétisme 1',
+    exemplaireId: 'ex_1101',
+    exemplaireCode: 'EX-1101',
+    adherentId: 'adh_014'
+  },
+  {
+    id: 'notif_init_015_1',
+    destinataireEmail: 'ifogojunior168+etu015@gmail.com',
+    destinataireNom: 'Ayoub El Amrani',
+    destinataireNumero: 'ETU-015',
+    sujet: 'Retour d\'un ouvrage – petit rappel',
+    corps: 'Bonjour Ayoub, l\'ouvrage « Traité de Droit Civil : Les Obligations » devait être rendu hier. Merci de le rapporter à la bibliothèque. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-1),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J1',
+    niveauMessage: 'J+1',
+    joursRetard: 1,
+    empruntId: 'emp_011',
+    ouvrageId: 'ow_12',
+    ouvrageTitre: 'Traité de Droit Civil : Les Obligations',
+    exemplaireId: 'ex_1201',
+    exemplaireCode: 'EX-1201',
+    adherentId: 'adh_015'
+  },
+  {
+    id: 'notif_init_015_2',
+    destinataireEmail: 'ifogojunior168+etu015@gmail.com',
+    destinataireNom: 'Ayoub El Amrani',
+    destinataireNumero: 'ETU-015',
+    sujet: 'Rappel – retour d\'un ouvrage de la bibliothèque',
+    corps: 'Bonjour Ayoub, sauf erreur de notre part, l\'ouvrage « Traité de Droit Civil : Les Obligations » est en retard de 2 jours. Merci de le rapporter dès que possible. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(0),
+    heureEnvoi: '09:15',
+    type: 'MESSAGE_J2',
+    niveauMessage: 'J+2',
+    joursRetard: 2,
+    empruntId: 'emp_011',
+    ouvrageId: 'ow_12',
+    ouvrageTitre: 'Traité de Droit Civil : Les Obligations',
+    exemplaireId: 'ex_1201',
+    exemplaireCode: 'EX-1201',
+    adherentId: 'adh_015'
+  },
+  {
+    id: 'notif_init_016_1',
+    destinataireEmail: 'ifogojunior168+etu016@gmail.com',
+    destinataireNom: 'Manal Filali',
+    destinataireNumero: 'ETU-016',
+    sujet: 'Retour d\'un ouvrage – petit rappel',
+    corps: 'Bonjour Manal, l\'ouvrage « Droit Constitutionnel et Institutions Politiques » devait être rendu. Merci de le rapporter à la bibliothèque. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-4),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J1',
+    niveauMessage: 'J+1',
+    joursRetard: 1,
+    empruntId: 'emp_012',
+    ouvrageId: 'ow_13',
+    ouvrageTitre: 'Droit Constitutionnel et Institutions Politiques',
+    exemplaireId: 'ex_1301',
+    exemplaireCode: 'EX-1301',
+    adherentId: 'adh_016'
+  },
+  {
+    id: 'notif_init_016_2',
+    destinataireEmail: 'ifogojunior168+etu016@gmail.com',
+    destinataireNom: 'Manal Filali',
+    destinataireNumero: 'ETU-016',
+    sujet: 'Rappel – retour d\'un ouvrage de la bibliothèque',
+    corps: 'Bonjour Manal, l\'ouvrage « Droit Constitutionnel et Institutions Politiques » est en retard. Merci de le rapporter dès que possible. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-3),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J2',
+    niveauMessage: 'J+2',
+    joursRetard: 2,
+    empruntId: 'emp_012',
+    ouvrageId: 'ow_13',
+    ouvrageTitre: 'Droit Constitutionnel et Institutions Politiques',
+    exemplaireId: 'ex_1301',
+    exemplaireCode: 'EX-1301',
+    adherentId: 'adh_016'
+  },
+  {
+    id: 'notif_init_017_1',
+    destinataireEmail: 'ifogojunior168+etu017@gmail.com',
+    destinataireNom: 'Othmane Tazi',
+    destinataireNumero: 'ETU-017',
+    sujet: 'Retour d\'un ouvrage – petit rappel',
+    corps: 'Bonjour Othmane, l\'ouvrage « L\'Avantage Concurrentiel » devait être rendu. Merci de le rapporter à la bibliothèque. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-6),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J1',
+    niveauMessage: 'J+1',
+    joursRetard: 1,
+    empruntId: 'emp_013',
+    ouvrageId: 'ow_14',
+    ouvrageTitre: 'L\'Avantage Concurrentiel',
+    exemplaireId: 'ex_1401',
+    exemplaireCode: 'EX-1401',
+    adherentId: 'adh_017'
+  },
+  {
+    id: 'notif_init_017_2',
+    destinataireEmail: 'ifogojunior168+etu017@gmail.com',
+    destinataireNom: 'Othmane Tazi',
+    destinataireNumero: 'ETU-017',
+    sujet: 'Rappel – retour d\'un ouvrage de la bibliothèque',
+    corps: 'Bonjour Othmane, l\'ouvrage « L\'Avantage Concurrentiel » est en retard. Merci de le rapporter dès que possible. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-5),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J2',
+    niveauMessage: 'J+2',
+    joursRetard: 2,
+    empruntId: 'emp_013',
+    ouvrageId: 'ow_14',
+    ouvrageTitre: 'L\'Avantage Concurrentiel',
+    exemplaireId: 'ex_1401',
+    exemplaireCode: 'EX-1401',
+    adherentId: 'adh_017'
+  },
+  {
+    id: 'notif_init_018_1',
+    destinataireEmail: 'ifogojunior168+etu018@gmail.com',
+    destinataireNom: 'Siham Kadiri',
+    destinataireNumero: 'ETU-018',
+    sujet: 'Retour d\'un ouvrage – petit rappel',
+    corps: 'Bonjour Siham, l\'ouvrage « Histoire Universelle du XXe Siècle : L\'Âge des Extrêmes » devait être rendu. Merci de le rapporter à la bibliothèque. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-7),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J1',
+    niveauMessage: 'J+1',
+    joursRetard: 1,
+    empruntId: 'emp_014',
+    ouvrageId: 'ow_15',
+    ouvrageTitre: 'Histoire Universelle du XXe Siècle : L\'Âge des Extrêmes',
+    exemplaireId: 'ex_1501',
+    exemplaireCode: 'EX-1501',
+    adherentId: 'adh_018'
+  },
+  {
+    id: 'notif_init_018_2',
+    destinataireEmail: 'ifogojunior168+etu018@gmail.com',
+    destinataireNom: 'Siham Kadiri',
+    destinataireNumero: 'ETU-018',
+    sujet: 'Rappel – retour d\'un ouvrage de la bibliothèque',
+    corps: 'Bonjour Siham, l\'ouvrage « Histoire Universelle du XXe Siècle : L\'Âge des Extrêmes » n\'a toujours pas été rapporté. Merci de le restituer sans délai. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-6),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J2',
+    niveauMessage: 'J+2',
+    joursRetard: 2,
+    empruntId: 'emp_014',
+    ouvrageId: 'ow_15',
+    ouvrageTitre: 'Histoire Universelle du XXe Siècle : L\'Âge des Extrêmes',
+    exemplaireId: 'ex_1501',
+    exemplaireCode: 'EX-1501',
+    adherentId: 'adh_018'
+  },
+  {
+    id: 'notif_init_019_1',
+    destinataireEmail: 'ifogojunior168+etu019@gmail.com',
+    destinataireNom: 'Zakaria Alaoui',
+    destinataireNumero: 'ETU-019',
+    sujet: 'Retour d\'un ouvrage – petit rappel',
+    corps: 'Bonjour Zakaria, l\'ouvrage « Biologie Moléculaire de la Cellule » devait être rendu. Merci de le rapporter à la bibliothèque. Cordialement, La bibliothèque universitaire.',
+    dateEnvoi: getRelativeDate(-9),
+    heureEnvoi: '09:00',
+    type: 'MESSAGE_J1',
+    niveauMessage: 'J+1',
+    joursRetard: 1,
+    empruntId: 'emp_015',
+    ouvrageId: 'ow_16',
+    ouvrageTitre: 'Biologie Moléculaire de la Cellule',
+    exemplaireId: 'ex_1601',
+    exemplaireCode: 'EX-1601',
+    adherentId: 'adh_019'
   }
 ];
-
-export const INITIAL_NOTIFICATIONS: EmailNotification[] = [];

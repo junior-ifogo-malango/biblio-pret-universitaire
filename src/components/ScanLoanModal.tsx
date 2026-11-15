@@ -9,7 +9,8 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Receipt, 
-  RotateCcw, 
+  RotateCcw,
+  Ban, 
   Search,
   Keyboard,
   ArrowRight,
@@ -23,7 +24,8 @@ export const ScanLoanModal: React.FC = () => {
   const { 
     isNewLoanOpen, 
     setIsNewLoanOpen, 
-    addLoanByScan, 
+    addLoanByScan,
+    cancelLoan, 
     setActiveReceiptEmprunt,
     adherents,
     exemplaires,
@@ -43,6 +45,8 @@ export const ScanLoanModal: React.FC = () => {
 
   // Result state
   const [refusalReason, setRefusalReason] = useState<string | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
   const [successData, setSuccessData] = useState<{
     emprunt: Emprunt;
     ouvrage: Ouvrage;
@@ -95,6 +99,8 @@ export const ScanLoanModal: React.FC = () => {
     setStudentSearch('');
     setRefusalReason(null);
     setSuccessData(null);
+    setShowCancelConfirm(false);
+    setIsCancelled(false);
     setCameraError(false);
   };
 
@@ -195,6 +201,13 @@ export const ScanLoanModal: React.FC = () => {
         adherent: res.adherent
       });
     }
+  };
+
+  const handleCancelRecordedLoan = () => {
+    if (!successData) return;
+    cancelLoan(successData.emprunt.id);
+    setIsCancelled(true);
+    setShowCancelConfirm(false);
   };
 
   const handleManualExemplaireSubmit = (e: React.FormEvent) => {
@@ -299,64 +312,124 @@ export const ScanLoanModal: React.FC = () => {
             </div>
           )}
 
-          {/* Success Screen */}
+          {/* Success Screen / Confirmation */}
           {successData && (
-            <div className="p-5 rounded-2xl bg-emerald-50/80 border-2 border-emerald-300 text-emerald-950 space-y-4 animate-in fade-in text-center">
-              <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center shadow-inner">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
+            <div className="p-5 rounded-2xl bg-slate-50 border-2 border-slate-200 text-slate-900 space-y-4 animate-in fade-in">
+              {isCancelled ? (
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-800 mx-auto flex items-center justify-center">
+                    <Ban className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-amber-900">Emprunt annulé</h3>
+                  <p className="text-xs text-amber-800">
+                    L'exemplaire <strong>{successData.exemplaire.codeQR}</strong> est redevenu <strong>DISPONIBLE</strong>. L'emprunt a été marqué annulé dans le registre sans être comptabilisé.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleClose}
+                      className="min-h-[44px] px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center space-y-1">
+                    <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center shadow-inner">
+                      <CheckCircle2 className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-base font-bold font-serif text-slate-900">
+                      Emprunt enregistré
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      N° d'enregistrement : <strong className="font-mono">{successData.emprunt.loanNumber}</strong>
+                    </p>
+                  </div>
 
-              <div>
-                <h3 className="text-base font-bold font-serif text-emerald-900">
-                  Emprunt Validé avec Succès !
-                </h3>
-                <p className="text-[11px] text-emerald-700 mt-0.5">
-                  N° d'enregistrement : <strong className="font-mono">{successData.emprunt.loanNumber}</strong>
-                </p>
-              </div>
+                  {/* Résumé (titre, étudiant, date de retour prévue) */}
+                  <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-left space-y-2 text-xs">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-slate-500 shrink-0">Titre :</span>
+                      <span className="font-bold text-slate-900 text-right">{successData.ouvrage.titre}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-slate-500 shrink-0">Exemplaire :</span>
+                      <span className="font-mono font-bold text-amber-800">{successData.exemplaire.codeQR}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-slate-500 shrink-0">Étudiant :</span>
+                      <span className="font-semibold text-slate-800">{successData.adherent.prenom} {successData.adherent.nom} ({successData.adherent.numeroEtudiant})</span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-slate-900 font-bold">
+                      <span className="text-slate-600">Date de retour prévue :</span>
+                      <span className="font-mono text-xs bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200">
+                        {new Date(successData.emprunt.dateRetourPrevue).toLocaleDateString('fr-FR')}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Loan Recap Card */}
-              <div className="bg-white p-3.5 rounded-xl border border-emerald-200 text-left space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Ouvrage :</span>
-                  <span className="font-bold text-slate-900 text-right">{successData.ouvrage.titre}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Exemplaire :</span>
-                  <span className="font-mono font-bold text-amber-800">{successData.exemplaire.codeQR} (Cote : {successData.ouvrage.cote})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Étudiant :</span>
-                  <span className="font-semibold text-slate-800">{successData.adherent.prenom} {successData.adherent.nom} ({successData.adherent.numeroEtudiant})</span>
-                </div>
-                <div className="pt-1.5 border-t border-slate-100 flex justify-between items-center text-emerald-900 font-bold">
-                  <span>Date limite de retour :</span>
-                  <span className="font-mono text-sm bg-emerald-100 px-2 py-0.5 rounded text-emerald-800">
-                    {new Date(successData.emprunt.dateRetourPrevue).toLocaleDateString('fr-FR')}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleClose();
-                    setActiveReceiptEmprunt(successData.emprunt);
-                  }}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition"
-                >
-                  <Receipt className="w-3.5 h-3.5 text-amber-400" />
-                  Imprimer le Reçu QR
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRetry}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition"
-                >
-                  Autre Prêt
-                </button>
-              </div>
+                  {/* Confirmation box if user clicked Annuler l'emprunt */}
+                  {showCancelConfirm ? (
+                    <div className="p-3.5 rounded-xl bg-red-50 border border-red-300 text-red-950 text-center space-y-2.5 animate-in fade-in">
+                      <p className="text-xs font-bold text-red-900">
+                        Annuler cet emprunt ?
+                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCancelRecordedLoan}
+                          className="min-h-[44px] px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition shadow-xs"
+                        >
+                          Oui
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCancelConfirm(false)}
+                          className="min-h-[44px] px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-xl text-xs transition"
+                        >
+                          Non
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Deux boutons : Terminer (principal) et Annuler l'emprunt (secondaire en rouge) */
+                    <div className="space-y-2 pt-1">
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleClose}
+                          className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition shadow-xs flex items-center justify-center"
+                        >
+                          Terminer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCancelConfirm(true)}
+                          className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-semibold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                        >
+                          <Ban className="w-3.5 h-3.5 text-red-600" />
+                          Annuler l'emprunt
+                        </button>
+                      </div>
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleClose();
+                            setActiveReceiptEmprunt(successData.emprunt);
+                          }}
+                          className="min-h-[44px] text-[11px] text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 underline"
+                        >
+                          <Receipt className="w-3 h-3 text-amber-600" />
+                          Imprimer le reçu QR
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -378,7 +451,7 @@ export const ScanLoanModal: React.FC = () => {
                   step === 2 ? 'border-amber-600 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-500'
                 }`}>
                   <User className="w-4 h-4 text-amber-600" />
-                  <span>2. Carte Étudiant</span>
+                  <span>2. Carte Étudiant EST</span>
                 </div>
               </div>
 
@@ -387,12 +460,12 @@ export const ScanLoanModal: React.FC = () => {
                 <p className="font-extrabold text-sm text-slate-800 font-serif">
                   {step === 1 
                     ? "Pointez la caméra vers le code QR de l'exemplaire" 
-                    : "Pointez la caméra vers le code QR de la carte étudiant"}
+                    : "Pointez la caméra vers le code QR de la carte étudiant EST"}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   {step === 1 
                     ? "L'étudiant présente le livre pris en rayon." 
-                    : `Exemplaire scanné : ${exemplaireCode}. Scannez maintenant sa carte.`}
+                    : `Exemplaire scanné : ${exemplaireCode}. Scannez maintenant sa carte étudiant EST (numéro d'étudiant).`}
                 </p>
               </div>
 
@@ -519,13 +592,40 @@ export const ScanLoanModal: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 text-right">
-          <button
-            onClick={handleClose}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:bg-slate-100"
-          >
-            Fermer
-          </button>
+        <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+          {/* Moment 2 : Exemplaire scanné, carte pas encore scannée -> bouton « Annuler » toujours visible qui quitte sans rien enregistrer */}
+          {step === 2 && !successData && !refusalReason ? (
+            <>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="min-h-[44px] px-4 py-2 text-xs font-bold rounded-xl text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition flex items-center gap-1.5"
+              >
+                <Ban className="w-3.5 h-3.5 text-red-600" />
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setExemplaireCode('');
+                }}
+                className="min-h-[44px] px-3 py-2 text-xs text-slate-500 hover:text-slate-800 underline"
+              >
+                Changer d'exemplaire
+              </button>
+            </>
+          ) : (
+            /* Moment 1 : Avant le scan de l'exemplaire -> bouton « Fermer » */
+            <div className="ml-auto">
+              <button
+                onClick={handleClose}
+                className="min-h-[44px] px-4 py-2 text-xs font-semibold rounded-xl text-slate-700 hover:bg-slate-100 transition"
+              >
+                Fermer
+              </button>
+            </div>
+          )}
         </div>
 
       </div>

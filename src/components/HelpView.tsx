@@ -39,7 +39,7 @@ export const HelpView: React.FC = () => {
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
             <strong className="text-slate-800 block font-medium">2. Restitution d'un exemplaire</strong>
             <p className="text-slate-600 leading-relaxed">
-              Cliquez sur <strong>Scanner un retour</strong> dans l'en-tête. Scannez le QR code du livre rendu, choisissez l'état constaté (bon état ou abîmé). Le système affiche immédiatement la consigne de rangement (tiroir et rangée).
+              Cliquez sur <strong>Scanner un retour</strong> dans l'en-tête. Scannez le QR code du livre rendu. L'emprunt est clôturé et le système affiche immédiatement la consigne de rangement (tiroir et rangée) avec le bouton « Reclasser ».
             </p>
           </div>
         </div>
@@ -53,23 +53,23 @@ export const HelpView: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
-            <strong className="text-slate-800 block font-medium">Exemplaires abîmés & réparations</strong>
+            <strong className="text-slate-800 block font-medium">Vie des exemplaires</strong>
             <p className="text-slate-500 leading-relaxed">
-              Un exemplaire restitué abîmé passe automatiquement en statut <em>EN RÉPARATION</em> sans notification. Une fois réparé, il redevient disponible ou est réservé au premier étudiant de la file d'attente.
+              Aucun dommage n'est géré. Les seules actions disponibles sur les exemplaires sont déclaré perdu (PERDU) et retrouvé (DISPONIBLE).
             </p>
           </div>
 
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
-            <strong className="text-slate-800 block font-medium">File d'attente & retrait 24h</strong>
+            <strong className="text-slate-800 block font-medium">Emprunt sur place par scan</strong>
             <p className="text-slate-500 leading-relaxed">
-              Lorsqu'un livre indisponible est restitué en bon état, il est mis de côté 24 heures pour le premier demandeur, qui reçoit un courriel automatique avec son emplacement de retrait.
+              Les emprunts se font uniquement sur place au guichet par double scan QR : d'abord le code du livre, puis la carte étudiante. Aucune réservation ni file d'attente.
             </p>
           </div>
 
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
             <strong className="text-slate-800 block font-medium">Gestion des retards</strong>
             <p className="text-slate-500 leading-relaxed">
-              Aucun frais financier n'est facturé. L'étudiant en retard est temporairement bloqué pour tout nouvel emprunt. Deux rappels lui sont envoyés avant le statut « à contacter ».
+              Aucun frais financier n'est facturé. L'étudiant en retard est temporairement bloqué pour tout nouvel emprunt. Des messages de ton adapté sont envoyés manuellement de J+1 à J+6 avant le passage en « À contacter » à J+7.
             </p>
           </div>
 

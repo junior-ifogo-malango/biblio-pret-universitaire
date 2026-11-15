@@ -5,14 +5,15 @@
 
 import React from 'react';
 import { LibraryProvider, useLibrary } from './context/LibraryContext';
-import { Navbar } from './components/Navbar';
+import { ManagerLayout } from './components/ManagerLayout';
 import { StudentCatalogView } from './components/StudentCatalogView';
+import { StudentWelcomeView } from './components/StudentWelcomeView';
+import { lireEtudiantConnecte, seDeconnecter, ConnectedStudent, observerEtatAuth } from './services/authService';
 import { DashboardView } from './components/DashboardView';
 import { LoansView } from './components/LoansView';
 import { BooksView } from './components/BooksView';
 import { MembersView } from './components/MembersView';
 import { HistoryView } from './components/HistoryView';
-import { QueueAndNotificationsView } from './components/QueueAndNotificationsView';
 import { AlertsView } from './components/AlertsView';
 
 // Modals
@@ -32,16 +33,26 @@ import { SettingsView } from './components/SettingsView';
 import { HelpView } from './components/HelpView';
 
 const MainManagerContent: React.FC = () => {
-  const { activeManagerTab } = useLibrary();
+  const { activeManagerTab, setActiveManagerTab } = useLibrary();
 
   return (
     <main className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+      {activeManagerTab !== 'dashboard' && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setActiveManagerTab('dashboard')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs"
+          >
+            <span>← Accueil</span>
+          </button>
+        </div>
+      )}
       {activeManagerTab === 'dashboard' && <DashboardView />}
       {activeManagerTab === 'loans' && <LoansView />}
       {activeManagerTab === 'catalog' && <BooksView />}
       {activeManagerTab === 'students' && <MembersView />}
       {activeManagerTab === 'history' && <HistoryView />}
-      {activeManagerTab === 'queue' && <QueueAndNotificationsView />}
       {activeManagerTab === 'alerts' && <AlertsView />}
       {activeManagerTab === 'settings' && <SettingsView />}
       {activeManagerTab === 'help' && <HelpView />}
@@ -50,8 +61,20 @@ const MainManagerContent: React.FC = () => {
 };
 
 const RootView: React.FC = () => {
+  const [connectedStudent, setConnectedStudent] = React.useState<ConnectedStudent | null>(() => {
+    return lireEtudiantConnecte();
+  });
+
+  const handleStudentLogout = async () => {
+    await seDeconnecter();
+    setConnectedStudent(null);
+  };
+
   const { 
     userRole, 
+    adherents,
+    allowedAcademicDomain,
+    ensureStudentAdherent,
     isQRScannerOpen, 
     setIsQRScannerOpen, 
     scanQRCode,
@@ -59,6 +82,8 @@ const RootView: React.FC = () => {
     setScannedExemplaire,
     activePrintLabelsOuvrageId,
     setActivePrintLabelsOuvrageId,
+    activePrintLabelExemplaireIds,
+    setActivePrintLabelExemplaireIds,
     ouvrages,
     exemplaires,
     getOuvrageById,
@@ -66,10 +91,31 @@ const RootView: React.FC = () => {
     setIsGlobalSearchOpen
   } = useLibrary();
 
+  const handleStudentLoginSuccess = (student: ConnectedStudent) => {
+    ensureStudentAdherent(student);
+    setConnectedStudent(student);
+  };
+
+  React.useEffect(() => {
+    const unsub = observerEtatAuth(
+      (student) => {
+        if (student) {
+          ensureStudentAdherent(student);
+          setConnectedStudent(student);
+        }
+      },
+      adherents,
+      allowedAcademicDomain
+    );
+    return () => unsub();
+  }, [adherents, allowedAcademicDomain, ensureStudentAdherent]);
+
   const activePrintOuvrage = activePrintLabelsOuvrageId ? getOuvrageById(activePrintLabelsOuvrageId) : null;
-  const copiesToPrint = activePrintLabelsOuvrageId 
-    ? exemplaires.filter(e => e.ouvrageId === activePrintLabelsOuvrageId && e.statut !== 'DETRUIT')
-    : [];
+  const copiesToPrint = activePrintLabelExemplaireIds
+    ? exemplaires.filter(e => activePrintLabelExemplaireIds.includes(e.id))
+    : activePrintLabelsOuvrageId
+      ? exemplaires.filter(e => e.ouvrageId === activePrintLabelsOuvrageId)
+      : [];
 
   const handleScanDetected = (scannedCode: string) => {
     setIsQRScannerOpen(false);
@@ -80,21 +126,31 @@ const RootView: React.FC = () => {
   };
 
   if (userRole === 'student') {
+    if (!connectedStudent) {
+      return (
+        <>
+          <StudentWelcomeView onLoginSuccess={handleStudentLoginSuccess} />
+          <ManagerLoginModal />
+        </>
+      );
+    }
+
     return (
       <>
-        <StudentCatalogView />
+        <StudentCatalogView 
+          currentStudent={connectedStudent} 
+          onLogout={handleStudentLogout} 
+        />
         <ManagerLoginModal />
       </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
-      <Navbar />
-      
-      <div className="flex-1">
+    <div className="min-h-screen font-sans">
+      <ManagerLayout>
         <MainManagerContent />
-      </div>
+      </ManagerLayout>
 
       {/* Global Modals */}
       <ManagerLoginModal />
@@ -111,8 +167,11 @@ const RootView: React.FC = () => {
       />
 
       <PrintableQRLabelsModal
-        isOpen={Boolean(activePrintLabelsOuvrageId)}
-        onClose={() => setActivePrintLabelsOuvrageId(null)}
+        isOpen={Boolean(activePrintLabelsOuvrageId || (activePrintLabelExemplaireIds && activePrintLabelExemplaireIds.length > 0))}
+        onClose={() => {
+          setActivePrintLabelsOuvrageId(null);
+          setActivePrintLabelExemplaireIds(null);
+        }}
         ouvrage={activePrintOuvrage}
         exemplaires={copiesToPrint}
         allOuvrages={ouvrages}
@@ -130,18 +189,6 @@ const RootView: React.FC = () => {
         onClose={() => setIsGlobalSearchOpen(false)} 
       />
 
-      {/* Manager Footer */}
-      <footer className="mt-auto border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-serif font-bold text-slate-800">BiblioPrêt Universitaire</span>
-            <span>— Système de prêt sur place & gestion des exemplaires physiques</span>
-          </div>
-          <div className="text-slate-400">
-            Contrôle d'accès par QR codes • Données sauvegardées dans le navigateur (localStorage)
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

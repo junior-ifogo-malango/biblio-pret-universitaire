@@ -4,25 +4,28 @@ import {
   Exemplaire, 
   Adherent, 
   Emprunt, 
-  DemandeAttente, 
-  StatutDemande,
   EmailNotification,
   Emplacement, 
-  EtatExemplaire, 
+  
   StatutExemplaire,
   BookCategory,
-  UserRole
+  UserRole,
+  MessageLevel
 } from '../types';
 import { 
   INITIAL_OUVRAGES, 
   INITIAL_EXEMPLAIRES, 
   INITIAL_ADHERENTS, 
   INITIAL_EMPRUNTS,
-  INITIAL_DEMANDES,
-  INITIAL_NOTIFICATIONS
+  INITIAL_NOTIFICATIONS,
+  LOCAL_COVERS_MAP
 } from '../data/mockData';
+import { ConnectedStudent } from '../services/authService';
+import { getNotificationTypeForLevel } from '../utils/overdueUtils';
 
-export type ManagerTab = 'dashboard' | 'loans' | 'catalog' | 'students' | 'history' | 'queue' | 'alerts' | 'settings' | 'help';
+export { LOCAL_COVERS_MAP };
+
+export type ManagerTab = 'dashboard' | 'loans' | 'catalog' | 'students' | 'history' | 'alerts' | 'settings' | 'help';
 
 interface LibraryContextType {
   // Role & Authentication
@@ -35,20 +38,17 @@ interface LibraryContextType {
   activeManagerTab: ManagerTab;
   setActiveManagerTab: (tab: ManagerTab) => void;
 
-  // Date Simulation
-  currentDate: string; // YYYY-MM-DD (simulated or real)
-  isSimulatedDate: boolean;
-  setSimulatedDate: (date: string) => void;
-  resetSimulatedDate: () => void;
-  advanceOneDay: () => void;
-  advanceDays: (days: number) => void;
+  // Date réelle
+  currentDate: string; // YYYY-MM-DD
+  allowedAcademicDomain: string;
+  setAllowedAcademicDomain: (domain: string) => void;
+  ensureStudentAdherent: (student: ConnectedStudent) => Adherent;
 
   // Core Data
   ouvrages: Ouvrage[];
   exemplaires: Exemplaire[];
   adherents: Adherent[];
   emprunts: Emprunt[];
-  demandes: DemandeAttente[];
   notifications: EmailNotification[];
 
   // Dynamic Calculated Helpers (Never stored, calculated on the fly)
@@ -65,11 +65,32 @@ interface LibraryContextType {
   isAdherentAutorise: (adherentId: string) => { autorise: boolean; motif?: string };
   getAdherentActiveEmprunts: (adherentId: string) => Emprunt[];
   
-  // Overdue calculation (rule 3)
+  // Overdue calculation (rule 5)
   isEmpruntEnRetard: (emprunt: Emprunt) => boolean;
   getJoursDeRetard: (dateRetourPrevue: string) => number;
   isEmpruntAContacter: (emprunt: Emprunt) => boolean;
-  runDailyChecks: (targetDateStr?: string) => { expiredReservationsCount: number; remindersSentCount: number };
+  recordManualReminder: (empruntId: string, payload: { level: MessageLevel; subject: string; body: string; daysLate: number }) => void;
+  recordGroupReminders: (
+    items: Array<{ empruntId: string; level: MessageLevel; subject: string; body: string; daysLate: number }>
+  ) => Array<{
+    empruntId: string;
+    notificationId: string;
+    previousNbRappels: number;
+    previousDateDernierRappel?: string;
+    previousDernierNiveauMessage?: MessageLevel;
+    previousDernierJourRetardMessage?: number;
+  }>;
+  revertGroupReminders: (
+    records: Array<{
+      empruntId: string;
+      notificationId: string;
+      previousNbRappels: number;
+      previousDateDernierRappel?: string;
+      previousDernierNiveauMessage?: MessageLevel;
+      previousDernierJourRetardMessage?: number;
+    }>
+  ) => void;
+  markLoansAsContacted: (empruntIds: string[]) => { count: number };
 
   // Configuration
   loanDurationDays: number;
@@ -81,6 +102,20 @@ interface LibraryContextType {
     nbExemplaires: number, 
     emplacement: Emplacement
   ) => { ouvrage: Ouvrage; exemplaires: Exemplaire[] };
+  addBulkOuvrages: (
+    items: Array<{
+      isbn: string;
+      titre: string;
+      auteur: string;
+      editeur: string;
+      anneeEdition: number;
+      pagination: number;
+      resume: string;
+      coverUrl: string;
+      categorie: BookCategory;
+    }>,
+    copiesPerBook: number
+  ) => { addedOuvrages: Ouvrage[]; addedExemplaires: Exemplaire[]; skippedCount: number };
   updateOuvrage: (id: string, updates: Partial<Ouvrage>) => void;
   
   addExemplairesToOuvrage: (
@@ -89,13 +124,10 @@ interface LibraryContextType {
     emplacement: Emplacement
   ) => Exemplaire[];
   updateExemplaire: (id: string, updates: Partial<Exemplaire>) => void;
-  reformeExemplaire: (id: string, motif: string) => void; // NO hard deletion
   
   // Physical life management actions
-  reparerExemplaire: (id: string) => { success: boolean; isReservedForQueue: boolean; reservedStudent?: Adherent };
-  declarerDommageRayon: (id: string) => { success: boolean };
   declarerPerdu: (id: string) => { success: boolean };
-  declarerRetrouve: (id: string) => { success: boolean; isReservedForQueue: boolean; reservedStudent?: Adherent };
+  declarerRetrouve: (id: string) => { success: boolean };
 
   // Loans & Returns by Scan (Without typing)
   addLoan: (
@@ -104,6 +136,7 @@ interface LibraryContextType {
     notes?: string
   ) => { success: boolean; error?: string; emprunt?: Emprunt };
 
+  cancelLoan: (empruntId: string) => { success: boolean; error?: string };
   addLoanByScan: (
     exemplaireCodeOrId: string,
     studentCodeOrId: string
@@ -118,13 +151,12 @@ interface LibraryContextType {
   
   returnLoan: (
     empruntId: string, 
-    etat: EtatExemplaire, 
     notes?: string
   ) => { success: boolean; exemplaire?: Exemplaire; emplacement?: Emplacement };
 
+  markLoanReclasse: (empruntId?: string, codeQR?: string) => void;
   returnByScan: (
-    exemplaireCodeOrId: string,
-    etat: 'bon' | 'abime'
+    exemplaireCodeOrId: string
   ) => {
     success: boolean;
     error?: string;
@@ -135,32 +167,7 @@ interface LibraryContextType {
     adherent?: Adherent;
     isOverdue?: boolean;
     daysLate?: number;
-    isReservedForQueue?: boolean;
-    reservedStudent?: Adherent;
-    dateLimiteRetrait?: string;
   };
-
-  // Waiting Queue & Reservation (1-day reservation rule)
-  inscrireFileAttente: (
-    ouvrageId: string, 
-    identifiantEtudiant: string
-  ) => { 
-    success: boolean; 
-    error?: string; 
-    rang?: number; 
-    tailleFile?: number; 
-    demande?: DemandeAttente; 
-    adherent?: Adherent; 
-    ouvrage?: Ouvrage 
-  };
-  annulerDemande: (demandeId: string) => { success: boolean; message?: string };
-  getQueueForOuvrage: (ouvrageId: string) => DemandeAttente[];
-  getStudentRankInQueue: (ouvrageId: string, adherentId: string) => number | null;
-  checkExpiredReservations: () => void;
-  activeQueueModalOuvrageId: string | null;
-  setActiveQueueModalOuvrageId: (id: string | null) => void;
-  isNotificationsModalOpen: boolean;
-  setIsNotificationsModalOpen: (open: boolean) => void;
 
   // QR Scanning & Lookups
   isQRScannerOpen: boolean;
@@ -178,6 +185,8 @@ interface LibraryContextType {
   setSelectedAdherent: (adh: Adherent | null) => void;
   activePrintLabelsOuvrageId: string | null;
   setActivePrintLabelsOuvrageId: (id: string | null) => void;
+  activePrintLabelExemplaireIds: string[] | null;
+  setActivePrintLabelExemplaireIds: (ids: string[] | null) => void;
   activeReceiptEmprunt: Emprunt | null;
   setActiveReceiptEmprunt: (emp: Emprunt | null) => void;
 
@@ -219,14 +228,13 @@ interface LibraryContextType {
     empruntsAContacter: number;
     rupturesStock: number;
     adherentsActifs: number;
-    demandesEnAttente: number;
-    exemplairesReserves: number;
     notificationsTotal: number;
   };
 
   // Maintenance
   resetToDefaultData: () => void;
   exportDatabaseJSON: () => void;
+  syncLocalCovers: () => Promise<{ success: boolean; count: number; error?: string }>;
 }
 
 const LibraryContext = createContext<LibraryContextType | undefined>(undefined);
@@ -235,10 +243,9 @@ const STORAGE_KEY_OUVRAGES = 'unilib_ouvrages_v8';
 const STORAGE_KEY_EXEMPLAIRES = 'unilib_exemplaires_v8';
 const STORAGE_KEY_ADHERENTS = 'unilib_adherents_v8';
 const STORAGE_KEY_EMPRUNTS = 'unilib_emprunts_v8';
-const STORAGE_KEY_DEMANDES = 'unilib_demandes_v8';
 const STORAGE_KEY_NOTIFICATIONS = 'unilib_notifications_v8';
 const STORAGE_KEY_ROLE = 'unilib_role_v8';
-const STORAGE_KEY_SIM_DATE = 'unilib_sim_date_v8';
+const STORAGE_KEY_DEMO_40_MIGRATED = 'unilib_demo_40_migrated';
 
 export const addDaysToDate = (baseDateStr: string, days: number): string => {
   const parts = baseDateStr.split('-');
@@ -269,81 +276,268 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   });
 
-  const [activeManagerTab, setActiveManagerTab] = useState<ManagerTab>('dashboard');
-  const [isManagerLoginOpen, setIsManagerLoginOpen] = useState(false);
-
-  // Date Simulation
-  const [simulatedDate, setSimulatedDateState] = useState<string | null>(() => {
+  const [activeManagerTab, setActiveManagerTabState] = useState<ManagerTab>(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY_SIM_DATE) || null;
+      const stateTab = window.history.state?.managerTab as ManagerTab | undefined;
+      return stateTab || 'dashboard';
     } catch {
-      return null;
+      return 'dashboard';
     }
   });
 
-  const currentDate = simulatedDate || new Date().toISOString().split('T')[0];
-  const isSimulatedDate = Boolean(simulatedDate);
-
-  const setSimulatedDate = (date: string) => {
-    setSimulatedDateState(date);
-    localStorage.setItem(STORAGE_KEY_SIM_DATE, date);
+  const setActiveManagerTab = (tab: ManagerTab) => {
+    setActiveManagerTabState(prev => {
+      if (prev !== tab) {
+        try {
+          window.history.pushState({ managerTab: tab }, '', window.location.pathname + window.location.search);
+        } catch {}
+      }
+      return tab;
+    });
   };
 
-  const resetSimulatedDate = () => {
-    setSimulatedDateState(null);
-    localStorage.removeItem(STORAGE_KEY_SIM_DATE);
+  useEffect(() => {
+    try {
+      if (!window.history.state?.managerTab) {
+        window.history.replaceState({ managerTab: activeManagerTab }, '', window.location.pathname + window.location.search);
+      }
+    } catch {}
+
+    const handlePopState = (e: PopStateEvent) => {
+      const targetTab = (e.state?.managerTab as ManagerTab | undefined) || 'dashboard';
+      setActiveManagerTabState(targetTab);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const [isManagerLoginOpen, setIsManagerLoginOpen] = useState(false);
+
+  // Date réelle du jour
+  const currentDate = new Date().toISOString().split('T')[0];
+  const [allowedAcademicDomain, setAllowedAcademicDomainState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('biblio_academic_domain');
+      if (!saved || saved === '@usmba.ac.ma' || saved === '*') {
+        localStorage.setItem('biblio_academic_domain', '@gmail.com');
+        return '@gmail.com';
+      }
+      return saved;
+    } catch {
+      return '@gmail.com';
+    }
+  });
+
+  const setAllowedAcademicDomain = (domain: string) => {
+  const clean = domain.trim().toLowerCase();
+
+  const formatted = (!clean || clean === '*' || clean === 'all')
+    ? '*'
+    : clean
+        .split(',')
+        .map(item => {
+          const value = item.trim().replace(/^@+/, '');
+          return value ? `@${value}` : '';
+        })
+        .filter(Boolean)
+        .join(', ');
+
+  setAllowedAcademicDomainState(formatted);
+
+  try {
+    localStorage.setItem('biblio_academic_domain', formatted);
+  } catch (err) {
+    console.error('Erreur sauvegarde domaine:', err);
+  }
+};
+
+  const deduplicateByNumero = (list: Adherent[]): Adherent[] => {
+    const map = new Map<string, Adherent>();
+    for (const adh of list) {
+      const key = (adh.numeroEtudiant || '').trim().toUpperCase();
+      if (!key) continue;
+      if (map.has(key)) {
+        const prev = map.get(key)!;
+        map.set(key, { ...prev, ...adh, id: prev.id || adh.id });
+      } else {
+        map.set(key, adh);
+      }
+    }
+    return Array.from(map.values());
+  };
+
+  // Remplacement unique des anciennes données de démonstration (ETU-2026-*) par les 40 adhérents (ETU-001 à ETU-040)
+  const shouldMigrateOldDemo = (() => {
+    try {
+      if (localStorage.getItem(STORAGE_KEY_DEMO_40_MIGRATED) === '1') return false;
+      const savedAdh = localStorage.getItem(STORAGE_KEY_ADHERENTS);
+      if (!savedAdh) {
+        localStorage.setItem(STORAGE_KEY_DEMO_40_MIGRATED, '1');
+        return false;
+      }
+      const parsed = JSON.parse(savedAdh);
+      const hasOldDemo = Array.isArray(parsed) && parsed.some((a: any) =>
+        a?.id === 'adh_user' || String(a?.numeroEtudiant || '').startsWith('ETU-2026-')
+      );
+      if (hasOldDemo) {
+        localStorage.setItem(STORAGE_KEY_EXEMPLAIRES, JSON.stringify(INITIAL_EXEMPLAIRES));
+        localStorage.setItem(STORAGE_KEY_ADHERENTS, JSON.stringify(INITIAL_ADHERENTS));
+        localStorage.setItem(STORAGE_KEY_EMPRUNTS, JSON.stringify(INITIAL_EMPRUNTS));
+        localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(INITIAL_NOTIFICATIONS));
+      }
+      localStorage.setItem(STORAGE_KEY_DEMO_40_MIGRATED, '1');
+      return hasOldDemo;
+    } catch {
+      return false;
+    }
+  })();
+
+  const ensureStudentAdherent = (student: ConnectedStudent): Adherent => {
+    const cleanEmail = student.email.trim().toLowerCase();
+    const existing = adherents.find(a =>
+      (a.emailAcademique && a.emailAcademique.trim().toLowerCase() === cleanEmail) ||
+      a.id === student.id
+    );
+    if (existing) return existing;
+
+    const currD = new Date(currentDate);
+    const currYear = currD.getFullYear();
+    const currMonth = currD.getMonth() + 1;
+    const targetEndYear = currMonth >= 9 ? currYear + 1 : currYear;
+    const endOfAcademicYear = `${targetEndYear}-08-31`;
+
+    const newAdh: Adherent = {
+      id: student.id || `adh_${Date.now()}`,
+      numeroEtudiant: `ETU-${String(adherents.length + 1).padStart(3, '0')}`,
+      nom: student.prenom ? 'Étudiant' : cleanEmail.split('@')[0],
+      prenom: student.prenom || 'Lecteur',
+      emailAcademique: cleanEmail,
+      dateInscription: currentDate,
+      dateExpiration: endOfAcademicYear,
+      statut: 'actif'
+    };
+
+    setAdherents(prev => {
+      const upperNum = newAdh.numeroEtudiant.trim().toUpperCase();
+      const idx = prev.findIndex(a => a.numeroEtudiant.trim().toUpperCase() === upperNum);
+      const updated = idx >= 0
+        ? prev.map((a, i) => (i === idx ? { ...a, ...newAdh, id: a.id } : a))
+        : [newAdh, ...prev];
+      try {
+        localStorage.setItem(STORAGE_KEY_ADHERENTS, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    return newAdh;
   };
 
   // Core Data
   const [ouvrages, setOuvrages] = useState<Ouvrage[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_OUVRAGES);
-      return saved ? JSON.parse(saved) : INITIAL_OUVRAGES;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map((o: Ouvrage) => {
+            // Si une couverture locale dédiée existe et que l'URL actuelle est vide ou openlibrary ou obsolète
+            if (LOCAL_COVERS_MAP[o.id] && (!o.coverUrl || o.coverUrl.includes('openlibrary.org') || !o.coverUrl.startsWith('/covers/'))) {
+              return { ...o, coverUrl: LOCAL_COVERS_MAP[o.id] };
+            }
+            return o;
+          });
+        }
+      }
+      return INITIAL_OUVRAGES;
     } catch {
       return INITIAL_OUVRAGES;
     }
   });
 
   const [exemplaires, setExemplaires] = useState<Exemplaire[]>(() => {
+    if (shouldMigrateOldDemo) return INITIAL_EXEMPLAIRES;
     try {
       const saved = localStorage.getItem(STORAGE_KEY_EXEMPLAIRES);
-      return saved ? JSON.parse(saved) : INITIAL_EXEMPLAIRES;
+      const list = saved ? JSON.parse(saved) : INITIAL_EXEMPLAIRES;
+      return list.map((e: any) => ({
+        id: e.id,
+        ouvrageId: e.ouvrageId,
+        codeQR: e.codeQR,
+        emplacement: e.emplacement,
+        statut: (e.statut === 'EN_REPARATION' || e.statut === 'DETRUIT') ? 'DISPONIBLE' : (e.statut || 'DISPONIBLE')
+      }));
     } catch {
       return INITIAL_EXEMPLAIRES;
     }
   });
 
   const [adherents, setAdherents] = useState<Adherent[]>(() => {
+    if (shouldMigrateOldDemo) return INITIAL_ADHERENTS;
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ADHERENTS);
-      return saved ? JSON.parse(saved) : INITIAL_ADHERENTS;
+      const list = saved ? JSON.parse(saved) : INITIAL_ADHERENTS;
+      const initialByNum = new Map(
+        INITIAL_ADHERENTS.map(a => [a.numeroEtudiant.trim().toUpperCase(), a])
+      );
+      const cleaned = list.map((a: any) => {
+        const { codeQR, ...cleanAdh } = a;
+        const numKey = String(cleanAdh.numeroEtudiant || '').trim().toUpperCase();
+        const seed = initialByNum.get(numKey);
+        return {
+          ...cleanAdh,
+          filiere: cleanAdh.filiere || seed?.filiere,
+          niveau: cleanAdh.niveau || seed?.niveau
+        } as Adherent;
+      });
+      return deduplicateByNumero(cleaned);
     } catch {
       return INITIAL_ADHERENTS;
     }
   });
 
   const [emprunts, setEmprunts] = useState<Emprunt[]>(() => {
+    if (shouldMigrateOldDemo) return INITIAL_EMPRUNTS;
     try {
       const saved = localStorage.getItem(STORAGE_KEY_EMPRUNTS);
-      return saved ? JSON.parse(saved) : INITIAL_EMPRUNTS;
+      const list = saved ? JSON.parse(saved) : INITIAL_EMPRUNTS;
+      return list.map((l: any) => {
+        const { etatAuRetour, ...cleanLoan } = l;
+        if (!cleanLoan.dernierNiveauMessage && (cleanLoan.nbRappels || 0) > 0) {
+          cleanLoan.dernierNiveauMessage = cleanLoan.nbRappels === 1 ? 'J+1' : 'J+2';
+          cleanLoan.dernierJourRetardMessage = cleanLoan.nbRappels === 1 ? 1 : 2;
+        }
+        return cleanLoan;
+      });
     } catch {
       return INITIAL_EMPRUNTS;
     }
   });
 
-  const [demandes, setDemandes] = useState<DemandeAttente[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_DEMANDES);
-      return saved ? JSON.parse(saved) : INITIAL_DEMANDES;
-    } catch {
-      return INITIAL_DEMANDES;
-    }
-  });
 
   const [notifications, setNotifications] = useState<EmailNotification[]>(() => {
+    if (shouldMigrateOldDemo) return INITIAL_NOTIFICATIONS;
     try {
       const saved = localStorage.getItem(STORAGE_KEY_NOTIFICATIONS);
-      return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+      if (!saved) return INITIAL_NOTIFICATIONS;
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return INITIAL_NOTIFICATIONS;
+      return parsed.map((n: EmailNotification) => {
+        if (n.niveauMessage) return n;
+        const inferredLevel: MessageLevel =
+          n.type === 'RAPPEL_RETARD_1' || n.type === 'MESSAGE_J1'
+            ? 'J+1'
+            : n.type === 'RAPPEL_RETARD_2' || n.type === 'MESSAGE_J2'
+              ? 'J+2'
+              : n.type === 'MESSAGE_J5'
+                ? 'J+5'
+                : n.type === 'MESSAGE_J6'
+                  ? 'J+6'
+                  : n.type === 'MESSAGE_J7_PLUS'
+                    ? 'J+7+'
+                    : 'J+3-4';
+        return { ...n, niveauMessage: inferredLevel };
+      });
     } catch {
       return INITIAL_NOTIFICATIONS;
     }
@@ -354,10 +548,19 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [scannedExemplaire, setScannedExemplaire] = useState<Exemplaire | null>(null);
   const [selectedOuvrage, setSelectedOuvrage] = useState<Ouvrage | null>(null);
   const [selectedAdherent, setSelectedAdherent] = useState<Adherent | null>(null);
-  const [activePrintLabelsOuvrageId, setActivePrintLabelsOuvrageId] = useState<string | null>(null);
+  const [activePrintLabelsOuvrageId, setActivePrintLabelsOuvrageIdState] = useState<string | null>(null);
+  const [activePrintLabelExemplaireIds, setActivePrintLabelExemplaireIdsState] = useState<string[] | null>(null);
   const [activeReceiptEmprunt, setActiveReceiptEmprunt] = useState<Emprunt | null>(null);
-  const [activeQueueModalOuvrageId, setActiveQueueModalOuvrageId] = useState<string | null>(null);
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+
+  const setActivePrintLabelsOuvrageId = (id: string | null) => {
+    setActivePrintLabelExemplaireIdsState(null);
+    setActivePrintLabelsOuvrageIdState(id);
+  };
+
+  const setActivePrintLabelExemplaireIds = (ids: string[] | null) => {
+    setActivePrintLabelsOuvrageIdState(null);
+    setActivePrintLabelExemplaireIdsState(ids);
+  };
 
   const [isNewLoanOpen, setIsNewLoanOpen] = useState(false);
   const [preselectedOuvrageId, setPreselectedOuvrageId] = useState<string | undefined>();
@@ -439,13 +642,15 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
        .replace(/[^a-z0-9]/g, '')
     );
 
-    // Identify required columns
+    // Identify required columns & optional columns (filiere, niveau)
     const idxNum = headers.findIndex(h => 
       h.includes('numero') || h.includes('etudiant') || h.includes('cne') || h.includes('matricule') || h === 'id'
     );
     const idxNom = headers.findIndex(h => h === 'nom' || (h.includes('nom') && !h.includes('prenom')));
     const idxPrenom = headers.findIndex(h => h.includes('prenom'));
     const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('mail') || h.includes('courriel'));
+    const idxFiliere = headers.findIndex(h => h.includes('filiere') || h.includes('departement') || h.includes('branche'));
+    const idxNiveau = headers.findIndex(h => h.includes('niveau') || h.includes('cycle') || h.includes('annee') || h.includes('semestre'));
 
     const missingColumns: string[] = [];
     if (idxNum === -1) missingColumns.push("Numéro d'étudiant");
@@ -472,6 +677,8 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       nom: string;
       prenom: string;
       emailAcademique: string;
+      filiere?: string;
+      niveau?: string;
     }
     const parsedRows: ParsedRow[] = [];
 
@@ -484,6 +691,8 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       const nom = (row[idxNom] || '').trim();
       const prenom = (row[idxPrenom] || '').trim();
       const emailAcademique = (row[idxEmail] || '').trim();
+      const filiere = idxFiliere >= 0 ? (row[idxFiliere] || '').trim() : '';
+      const niveau = idxNiveau >= 0 ? (row[idxNiveau] || '').trim() : '';
 
       if (!numeroEtudiant) {
         errors.push(`Ligne ${lineNum} : Le numéro d'étudiant est vide.`);
@@ -494,7 +703,9 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
         numeroEtudiant,
         nom,
         prenom,
-        emailAcademique
+        emailAcademique,
+        filiere: filiere || undefined,
+        niveau: niveau || undefined
       });
     }
 
@@ -540,6 +751,8 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
           nom: row.nom || updatedAdherents[existingIndex].nom,
           prenom: row.prenom || updatedAdherents[existingIndex].prenom,
           emailAcademique: row.emailAcademique || updatedAdherents[existingIndex].emailAcademique,
+          filiere: row.filiere !== undefined ? row.filiere : updatedAdherents[existingIndex].filiere,
+          niveau: row.niveau !== undefined ? row.niveau : updatedAdherents[existingIndex].niveau,
           dateExpiration: endOfAcademicYear,
           statut: 'actif'
         };
@@ -552,7 +765,8 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
           nom: row.nom,
           prenom: row.prenom,
           emailAcademique: row.emailAcademique,
-          codeQR: row.numeroEtudiant,
+          ...(row.filiere ? { filiere: row.filiere } : {}),
+          ...(row.niveau ? { niveau: row.niveau } : {}),
           dateInscription: currentDate,
           dateExpiration: endOfAcademicYear,
           statut: 'actif'
@@ -562,15 +776,12 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     });
 
-    // Students absent from the new list are set to 'resilie' and their queue requests cancelled
-    const studentsToCancelRequests = new Set<string>();
-
+    // Students absent from the new list are set to 'resilie'
     updatedAdherents = updatedAdherents.map(adh => {
       const upperNum = adh.numeroEtudiant.trim().toUpperCase();
       if (!importedNumeros.has(upperNum)) {
         if (adh.statut === 'actif') {
           resiliesCount++;
-          studentsToCancelRequests.add(adh.id);
         }
         return {
           ...adh,
@@ -579,16 +790,6 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
       return adh;
     });
-
-    // Cancel pending queue requests for resiliated students
-    if (studentsToCancelRequests.size > 0) {
-      setDemandes(prev => prev.map(d => {
-        if (studentsToCancelRequests.has(d.adherentId) && (d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE')) {
-          return { ...d, statut: 'ANNULEE' };
-        }
-        return d;
-      }));
-    }
 
     setAdherents(updatedAdherents);
 
@@ -620,9 +821,6 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem(STORAGE_KEY_EMPRUNTS, JSON.stringify(emprunts));
   }, [emprunts]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_DEMANDES, JSON.stringify(demandes));
-  }, [demandes]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(notifications));
@@ -656,16 +854,16 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const getTotalCopiesCount = (ouvrageId: string): number => {
-    return exemplaires.filter(e => e.ouvrageId === ouvrageId && e.statut !== 'DETRUIT').length;
+    return exemplaires.filter(e => e.ouvrageId === ouvrageId).length;
   };
 
   const getAdherentActiveEmprunts = (adherentId: string): Emprunt[] => {
-    return emprunts.filter(e => e.adherentId === adherentId && e.statut === 'en_cours');
+    return emprunts.filter(e => e.adherentId === adherentId && e.statut === 'en_cours' && !e.annule);
   };
 
   // Overdue calculations
   const isEmpruntEnRetard = (emp: Emprunt): boolean => {
-    if (emp.statut !== 'en_cours') return false;
+    if (emp.statut !== 'en_cours' || emp.annule) return false;
     return emp.dateRetourPrevue < currentDate;
   };
 
@@ -677,11 +875,10 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     return diff > 0 ? diff : 0;
   };
 
-  // Après le 2e rappel sans retour, l'emprunt est « à contacter »
+  // « À contacter » = retard de 7 jours ou plus (contact hors application)
   const isEmpruntAContacter = (emp: Emprunt): boolean => {
-    if (emp.statut !== 'en_cours') return false;
-    if (!isEmpruntEnRetard(emp)) return false;
-    return (emp.nbRappels || 0) >= 2;
+    if (emp.statut !== 'en_cours' || emp.annule) return false;
+    return getJoursDeRetard(emp.dateRetourPrevue) >= 7;
   };
 
   // Student authorization check (rule 3: calculé à la volée)
@@ -732,16 +929,157 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
         id: copyId,
         ouvrageId,
         codeQR: `EX-${baseCodeNum + i}`,
-        etat: 'bon',
         statut: 'DISPONIBLE',
         emplacement: { ...emplacement }
       });
     }
 
-    setOuvrages(prev => [newOuvrage, ...prev]);
-    setExemplaires(prev => [...newCopies, ...prev]);
+    setOuvrages(prev => [...prev, newOuvrage]);
+    setExemplaires(prev => [...prev, ...newCopies]);
 
     return { ouvrage: newOuvrage, exemplaires: newCopies };
+  };
+
+  // Ajout en lot depuis Google Books : contrôle anti-doublon ISBN, génération automatique cote/QR/emplacement
+  const addBulkOuvrages = (
+    items: Array<{
+      isbn: string;
+      titre: string;
+      auteur: string;
+      editeur: string;
+      anneeEdition: number;
+      pagination: number;
+      resume: string;
+      coverUrl: string;
+      categorie: BookCategory;
+    }>,
+    copiesPerBook: number
+  ) => {
+    const CATEGORY_COTE_PREFIX: Record<BookCategory, string> = {
+      'Informatique & Numérique': 'INFO',
+      'Sciences & Techniques': 'SCI',
+      'Mathématiques & Physique': 'MATH',
+      'Histoire & Géographie': 'HIST',
+      'Économie & Gestion': 'ECO',
+      'Droit & Sciences Politiques': 'DROIT',
+      'Philosophie & Éthique': 'PHIL',
+      'Langues & Littérature': 'LETT',
+      'Médecine & Santé': 'MED',
+      'Général & Référence': 'GEN'
+    };
+
+    const CATEGORY_DRAWER: Record<BookCategory, string> = {
+      'Informatique & Numérique': 'T1',
+      'Économie & Gestion': 'T2',
+      'Mathématiques & Physique': 'T3',
+      'Sciences & Techniques': 'T4',
+      'Droit & Sciences Politiques': 'T5',
+      'Histoire & Géographie': 'T6',
+      'Philosophie & Éthique': 'T7',
+      'Langues & Littérature': 'T8',
+      'Médecine & Santé': 'T9',
+      'Général & Référence': 'T10'
+    };
+
+    const cleanIsbn = (raw?: string) => (raw || '').replace(/[^0-9X]/gi, '').toUpperCase();
+
+    const existingIsbns = new Set(
+      ouvrages.map(o => cleanIsbn(o.isbn)).filter(Boolean)
+    );
+
+    // Numéro continu le plus élevé pour les cotes par préfixe
+    const maxCoteByPrefix = new Map<string, number>();
+    for (const o of ouvrages) {
+      const m = o.cote?.match(/^([A-Z]+)-(\d+)$/i);
+      if (m) {
+        const pref = m[1].toUpperCase();
+        const num = parseInt(m[2], 10);
+        if (!isNaN(num)) {
+          maxCoteByPrefix.set(pref, Math.max(maxCoteByPrefix.get(pref) || 0, num));
+        }
+      }
+    }
+
+    // Numéro continu le plus élevé pour EX-xxxx
+    let maxCopyCodeNum = 2000;
+    for (const ex of exemplaires) {
+      const m = ex.codeQR?.match(/^EX-(\d+)$/i);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        if (!isNaN(num) && num > maxCopyCodeNum) {
+          maxCopyCodeNum = num;
+        }
+      }
+    }
+
+    // Compteur d'ouvrages déjà présents par tiroir pour faire tourner les rangées R1..R4
+    const drawerRotationCount = new Map<string, number>();
+    for (const ex of exemplaires) {
+      const t = ex.emplacement?.tiroir;
+      if (t) {
+        drawerRotationCount.set(t, (drawerRotationCount.get(t) || 0) + 1);
+      }
+    }
+
+    const safeCopiesCount = Math.min(3, Math.max(1, Math.round(copiesPerBook || 2)));
+    const addedOuvrages: Ouvrage[] = [];
+    const addedExemplaires: Exemplaire[] = [];
+    let skippedCount = 0;
+    const baseTimestamp = Date.now();
+
+    items.forEach((item, idx) => {
+      const normIsbn = cleanIsbn(item.isbn);
+      if (!normIsbn || !item.titre?.trim() || existingIsbns.has(normIsbn)) {
+        skippedCount++;
+        return;
+      }
+      existingIsbns.add(normIsbn);
+
+      const prefix = CATEGORY_COTE_PREFIX[item.categorie] || 'GEN';
+      const nextCoteNum = (maxCoteByPrefix.get(prefix) || 0) + 1;
+      maxCoteByPrefix.set(prefix, nextCoteNum);
+      const cote = `${prefix}-${String(nextCoteNum).padStart(3, '0')}`;
+
+      const ouvrageId = `ow_${baseTimestamp}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
+      const newOuvrage: Ouvrage = {
+        id: ouvrageId,
+        titre: item.titre.trim(),
+        auteur: item.auteur.trim() || 'Auteur non renseigné',
+        isbn: normIsbn,
+        editeur: item.editeur.trim() || 'Éditeur non renseigné',
+        anneeEdition: item.anneeEdition || new Date().getFullYear(),
+        categorie: item.categorie,
+        cote,
+        pagination: item.pagination || 0,
+        resume: item.resume.trim(),
+        empruntable: true,
+        coverUrl: item.coverUrl ? item.coverUrl.replace(/^http:\/\//i, 'https://') : ''
+      };
+      addedOuvrages.push(newOuvrage);
+
+      const tiroir = CATEGORY_DRAWER[item.categorie] || 'T10';
+      const drawerStep = drawerRotationCount.get(tiroir) || 0;
+      drawerRotationCount.set(tiroir, drawerStep + 1);
+      const rangee = `R${(drawerStep % 4) + 1}`;
+
+      for (let c = 0; c < safeCopiesCount; c++) {
+        maxCopyCodeNum++;
+        addedExemplaires.push({
+          id: `ex_${baseTimestamp}_${idx}_${c}_${Math.random().toString(36).slice(2, 6)}`,
+          ouvrageId,
+          codeQR: `EX-${String(maxCopyCodeNum).padStart(4, '0')}`,
+          statut: 'DISPONIBLE',
+          emplacement: { tiroir, rangee }
+        });
+      }
+    });
+
+    if (addedOuvrages.length > 0) {
+      setOuvrages(prev => [...prev, ...addedOuvrages]);
+      setExemplaires(prev => [...prev, ...addedExemplaires]);
+    }
+
+    return { addedOuvrages, addedExemplaires, skippedCount };
   };
 
   const updateOuvrage = (id: string, updates: Partial<Ouvrage>) => {
@@ -764,7 +1102,6 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
         id: `ex_${Date.now()}_${i}`,
         ouvrageId,
         codeQR: `EX-${baseCodeNum + i}`,
-        etat: 'bon',
         statut: 'DISPONIBLE',
         emplacement: { ...emplacement }
       });
@@ -781,95 +1118,7 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  // Rule 4: On ne supprime jamais rien -> réforme / destruction archivée
-  // Irréparable : statut DETRUIT avec dateReforme et motifReforme. L'exemplaire n'est jamais supprimé, DETRUIT est un état final.
-  const reformeExemplaire = (id: string, motif: string) => {
-    updateExemplaire(id, {
-      statut: 'DETRUIT',
-      dateReforme: currentDate,
-      motifReforme: motif
-    });
-  };
-
-  // Gestion de la vie physique des exemplaires
-  // 1. Signaler un dommage sur un exemplaire en rayon (statut EN_REPARATION, etat = abîmé).
-  const declarerDommageRayon = (id: string): { success: boolean } => {
-    const ex = getExemplaireById(id);
-    if (!ex) return { success: false };
-    updateExemplaire(id, {
-      statut: 'EN_REPARATION',
-      etat: 'abîmé'
-    });
-    return { success: true };
-  };
-
-  // 2. Réparé : même logique qu'un retour en bon état.
-  // File non vide : RESERVE et e-mail à la première demande.
-  // File vide : DISPONIBLE.
-  const reparerExemplaire = (id: string): { success: boolean; isReservedForQueue: boolean; reservedStudent?: Adherent } => {
-    const ex = getExemplaireById(id);
-    if (!ex) return { success: false, isReservedForQueue: false };
-
-    const ow = getOuvrageById(ex.ouvrageId);
-    const waitingDemands = demandes
-      .filter(d => d.ouvrageId === ex.ouvrageId && d.statut === 'EN_ATTENTE')
-      .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-
-    if (waitingDemands.length > 0 && ow) {
-      const firstDemand = waitingDemands[0];
-      const dateLimiteRetrait = addDaysToDate(currentDate, 1);
-      const studentToNotify = getAdherentById(firstDemand.adherentId);
-
-      updateExemplaire(ex.id, {
-        statut: 'RESERVE',
-        etat: 'bon'
-      });
-
-      setDemandes(prev => prev.map(d => d.id === firstDemand.id ? {
-        ...d,
-        statut: 'NOTIFIEE',
-        dateNotification: currentDate,
-        dateLimiteRetrait,
-        exemplaireReserveId: ex.id
-      } : d));
-
-      if (studentToNotify) {
-        sendNotificationEmail({
-          destinataireEmail: studentToNotify.emailAcademique,
-          destinataireNom: `${studentToNotify.prenom} ${studentToNotify.nom}`,
-          destinataireNumero: studentToNotify.numeroEtudiant,
-          sujet: `Exemplaire réparé et disponible (File d'attente) : ${ow.titre}`,
-          corps: `Bonjour ${studentToNotify.prenom},\n\nUn exemplaire physique de l'ouvrage "${ow.titre}" (Cote : ${ow.cote}) vient d'être réparé et remis en circulation.\nIl vous est exclusivement réservé pour une durée de 24 heures calendaires.\n\nEmplacement de rangement : Tiroir ${ex.emplacement.tiroir}, Rangée ${ex.emplacement.rangee}\nDate limite impérative de retrait : ${dateLimiteRetrait}\n\nVeuillez vous présenter au guichet de la bibliothèque avec votre carte d'étudiant pour scanner et enregistrer votre prêt.\nPassé ce délai de 24h, l'exemplaire sera automatiquement réattribué à l'étudiant suivant dans la file d'attente.\n\nCordialement,\nLe Service des Prêts Universitaire`,
-          dateEnvoi: currentDate,
-          heureEnvoi: '09:00',
-          type: 'RESERVATION_DISPONIBLE',
-          ouvrageId: ow.id,
-          ouvrageTitre: ow.titre,
-          exemplaireId: ex.id,
-          exemplaireCode: ex.codeQR,
-          emplacement: ex.emplacement,
-          dateLimiteRetrait,
-          adherentId: studentToNotify.id
-        });
-      }
-
-      return {
-        success: true,
-        isReservedForQueue: true,
-        reservedStudent: studentToNotify
-      };
-    } else {
-      updateExemplaire(ex.id, {
-        statut: 'DISPONIBLE',
-        etat: 'bon'
-      });
-      return {
-        success: true,
-        isReservedForQueue: false
-      };
-    }
-  };
-
+  // Seules actions physiques : declarerPerdu et declarerRetrouve
   // 3. Perdu : statut PERDU, réversible vers DISPONIBLE si retrouvé
   const declarerPerdu = (id: string): { success: boolean } => {
     const ex = getExemplaireById(id);
@@ -880,69 +1129,15 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     return { success: true };
   };
 
-  // 4. Retrouvé : réversible vers DISPONIBLE ou RESERVE si file d'attente
-  const declarerRetrouve = (id: string): { success: boolean; isReservedForQueue: boolean; reservedStudent?: Adherent } => {
+  // 4. Retrouvé : réversible vers DISPONIBLE sans notification
+  const declarerRetrouve = (id: string): { success: boolean } => {
     const ex = getExemplaireById(id);
-    if (!ex) return { success: false, isReservedForQueue: false };
+    if (!ex) return { success: false };
 
-    const ow = getOuvrageById(ex.ouvrageId);
-    const waitingDemands = demandes
-      .filter(d => d.ouvrageId === ex.ouvrageId && d.statut === 'EN_ATTENTE')
-      .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-
-    if (waitingDemands.length > 0 && ow) {
-      const firstDemand = waitingDemands[0];
-      const dateLimiteRetrait = addDaysToDate(currentDate, 1);
-      const studentToNotify = getAdherentById(firstDemand.adherentId);
-
-      updateExemplaire(ex.id, {
-        statut: 'RESERVE',
-        etat: 'bon'
-      });
-
-      setDemandes(prev => prev.map(d => d.id === firstDemand.id ? {
-        ...d,
-        statut: 'NOTIFIEE',
-        dateNotification: currentDate,
-        dateLimiteRetrait,
-        exemplaireReserveId: ex.id
-      } : d));
-
-      if (studentToNotify) {
-        sendNotificationEmail({
-          destinataireEmail: studentToNotify.emailAcademique,
-          destinataireNom: `${studentToNotify.prenom} ${studentToNotify.nom}`,
-          destinataireNumero: studentToNotify.numeroEtudiant,
-          sujet: `Exemplaire retrouvé et disponible (File d'attente) : ${ow.titre}`,
-          corps: `Bonjour ${studentToNotify.prenom},\n\nUn exemplaire physique de l'ouvrage "${ow.titre}" (Cote : ${ow.cote}) qui était égaré a été retrouvé et remis en circulation.\nIl vous est exclusivement réservé pour une durée de 24 heures calendaires.\n\nEmplacement de rangement : Tiroir ${ex.emplacement.tiroir}, Rangée ${ex.emplacement.rangee}\nDate limite impérative de retrait : ${dateLimiteRetrait}\n\nVeuillez vous présenter au guichet de la bibliothèque avec votre carte d'étudiant pour scanner et enregistrer votre prêt.\nPassé ce délai de 24h, l'exemplaire sera automatiquement réattribué à l'étudiant suivant dans la file d'attente.\n\nCordialement,\nLe Service des Prêts Universitaire`,
-          dateEnvoi: currentDate,
-          heureEnvoi: '09:00',
-          type: 'RESERVATION_DISPONIBLE',
-          ouvrageId: ow.id,
-          ouvrageTitre: ow.titre,
-          exemplaireId: ex.id,
-          exemplaireCode: ex.codeQR,
-          emplacement: ex.emplacement,
-          dateLimiteRetrait,
-          adherentId: studentToNotify.id
-        });
-      }
-
-      return {
-        success: true,
-        isReservedForQueue: true,
-        reservedStudent: studentToNotify
-      };
-    } else {
-      updateExemplaire(ex.id, {
-        statut: 'DISPONIBLE',
-        etat: 'bon'
-      });
-      return {
-        success: true,
-        isReservedForQueue: false
-      };
-    }
+    updateExemplaire(ex.id, {
+      statut: 'DISPONIBLE',
+    });
+    return { success: true };
   };
 
   // Loans
@@ -997,7 +1192,6 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Return Loan
   const returnLoan = (
     empruntId: string, 
-    etat: EtatExemplaire, 
     notes?: string
   ) => {
     const emp = emprunts.find(e => e.id === empruntId);
@@ -1012,18 +1206,35 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       ...e,
       statut: 'rendu',
       dateRetourEffective: currentDate,
-      etatAuRetour: etat,
       notes: notes ? (e.notes ? `${e.notes} | ${notes}` : notes) : e.notes
     } : e));
 
-    // Update exemplaire to DISPONIBLE and update etat
+    // Update exemplaire to DISPONIBLE
     if (ex) {
       updateExemplaire(ex.id, {
-        statut: 'DISPONIBLE',
-        etat
+        statut: 'DISPONIBLE'
       });
       return { success: true, exemplaire: ex, emplacement: ex.emplacement };
     }
+
+    return { success: true };
+  };
+
+  // Annuler un emprunt (erreur de scan)
+  const cancelLoan = (empruntId: string): { success: boolean; error?: string } => {
+    const target = emprunts.find(e => e.id === empruntId);
+    if (!target) {
+      return { success: false, error: "Emprunt introuvable." };
+    }
+    const cancelNote = "Emprunt annulé";
+    setEmprunts(prev => prev.map(e => e.id === empruntId ? {
+      ...e,
+      annule: true,
+      notes: e.notes ? (e.notes + " | " + cancelNote) : cancelNote
+    } : e));
+
+    // Remettre l'exemplaire au statut DISPONIBLE
+    updateExemplaire(target.exemplaireId, { statut: 'DISPONIBLE' });
 
     return { success: true };
   };
@@ -1053,27 +1264,18 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       };
     }
 
-    // 2. Resolve Student
+    // 2. Resolve Student (carte étudiante EST portant le numeroEtudiant)
     const cleanStudCode = studentCodeOrId.trim().toUpperCase();
     const student = adherents.find(a => 
-      a.codeQR.trim().toUpperCase() === cleanStudCode || 
       a.numeroEtudiant.trim().toUpperCase() === cleanStudCode || 
       a.id === studentCodeOrId
     );
     if (!student) {
-      return { success: false, error: `Étudiant introuvable avec le numéro/carte "${studentCodeOrId}".` };
+      return { success: false, error: "Carte non reconnue : étudiant absent de la liste importée" };
     }
 
-    // Rule 2: L'exemplaire n'est pas réservé pour un autre adhérent
-    if (ex.statut === 'RESERVE') {
-      const reservation = demandes.find(d => d.exemplaireReserveId === ex.id && (d.statut === 'NOTIFIEE' || d.statut === 'EN_ATTENTE'));
-      if (reservation && reservation.adherentId !== student.id) {
-        return { 
-          success: false, 
-          error: "Refus d'emprunt : Réservé pour un autre adhérent." 
-        };
-      }
-    } else if (ex.statut !== 'DISPONIBLE') {
+    // Rule 2: L'exemplaire doit être DISPONIBLE
+    if (ex.statut !== 'DISPONIBLE') {
       return { 
         success: false, 
         error: `Refus d'emprunt : Cet exemplaire n'est pas disponible pour le prêt (statut actuel : ${ex.statut}).` 
@@ -1125,13 +1327,6 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     updateExemplaire(ex.id, { statut: 'EMPRUNTE' });
     setEmprunts(prev => [newEmprunt, ...prev]);
 
-    // Rule 5: Toute demande en file de cet adhérent pour cet ouvrage passe à SERVIE
-    setDemandes(prev => prev.map(d => 
-      d.adherentId === student.id && d.ouvrageId === ow.id && (d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE')
-        ? { ...d, statut: 'SERVIE' }
-        : d
-    ));
-
     return {
       success: true,
       emprunt: newEmprunt,
@@ -1141,419 +1336,205 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   };
 
-  const sendNotificationEmail = (data: Omit<EmailNotification, 'id'>) => {
+  // Enregistrement purement manuel d'un message envoyé via la messagerie du gestionnaire
+  const recordManualReminder = (
+    empruntId: string,
+    payload: { level: MessageLevel; subject: string; body: string; daysLate: number }
+  ) => {
+    const emp = emprunts.find(e => e.id === empruntId);
+    if (!emp) return;
+    const adh = getAdherentById(emp.adherentId);
+    const ow = getOuvrageById(emp.ouvrageId);
+    const ex = getExemplaireById(emp.exemplaireId);
+    if (!adh || !ow) return;
+
+    const now = new Date();
+    const heureEnvoi = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
     const newNotif: EmailNotification = {
-      ...data,
-      id: `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-    return newNotif;
-  };
-
-  const getQueueForOuvrage = (ouvrageId: string) => {
-    return demandes
-      .filter(d => d.ouvrageId === ouvrageId && (d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE'))
-      .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-  };
-
-  const getStudentRankInQueue = (ouvrageId: string, adherentId: string): number | null => {
-    const queue = getQueueForOuvrage(ouvrageId);
-    const idx = queue.findIndex(d => d.adherentId === adherentId);
-    return idx !== -1 ? idx + 1 : null;
-  };
-
-  // Inscription in waiting queue (Student Catalog)
-  const inscrireFileAttente = (
-    ouvrageId: string, 
-    identifiantEtudiant: string
-  ): { 
-    success: boolean; 
-    error?: string; 
-    rang?: number; 
-    tailleFile?: number; 
-    demande?: DemandeAttente; 
-    adherent?: Adherent; 
-    ouvrage?: Ouvrage 
-  } => {
-    const ow = getOuvrageById(ouvrageId);
-    if (!ow) {
-      return { success: false, error: "Ouvrage introuvable." };
-    }
-
-    // Rule: Impossible pour un ouvrage non empruntable
-    if (!ow.empruntable) {
-      return { 
-        success: false, 
-        error: "Inscription impossible : cet ouvrage est réservé à la consultation sur place uniquement." 
-      };
-    }
-
-    // Rule: Impossible pour un ouvrage ayant un exemplaire disponible
-    const dispoCount = getAvailableCopiesCount(ow.id);
-    if (dispoCount > 0) {
-      return { 
-        success: false, 
-        error: `Inscription impossible : ${dispoCount} exemplaire(s) actuellement disponible(s) en rayon. Vous pouvez le retirer directement.` 
-      };
-    }
-
-    // Student identification by student number, QR code or id
-    const cleanId = identifiantEtudiant.trim().toUpperCase();
-    const student = adherents.find(a => 
-      a.numeroEtudiant.trim().toUpperCase() === cleanId || 
-      a.codeQR.trim().toUpperCase() === cleanId || 
-      a.id === identifiantEtudiant
-    );
-
-    if (!student) {
-      return { 
-        success: false, 
-        error: `Numéro d'étudiant "${identifiantEtudiant}" introuvable dans la liste officielle des inscriptions.` 
-      };
-    }
-
-    if (student.statut !== 'actif') {
-      return { 
-        success: false, 
-        error: "Inscription impossible : le compte étudiant est résilié." 
-      };
-    }
-
-    // Rule: Inscription autorisée même si l'adhérent est en retard !
-
-    // Rule: Une seule demande active par adhérent et par ouvrage
-    const existingDemand = demandes.find(d => 
-      d.adherentId === student.id && 
-      d.ouvrageId === ow.id && 
-      (d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE')
-    );
-
-    if (existingDemand) {
-      const activeQueue = demandes
-        .filter(d => d.ouvrageId === ow.id && (d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE'))
-        .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-      const userIndex = activeQueue.findIndex(d => d.id === existingDemand.id);
-      const userRank = userIndex !== -1 ? userIndex + 1 : 1;
-      return { 
-        success: false, 
-        error: `Vous êtes déjà inscrit dans la file d'attente pour cet ouvrage au rang ${userRank} (${activeQueue.length} demande(s) au total).` 
-      };
-    }
-
-    // Create new demand (ordered by dateInscription)
-    const newDemandeId = `dem_${Date.now()}`;
-    const newDemande: DemandeAttente = {
-      id: newDemandeId,
-      adherentId: student.id,
+      id: `notif_${emp.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      destinataireEmail: adh.emailAcademique,
+      destinataireNom: `${adh.prenom} ${adh.nom}`,
+      destinataireNumero: adh.numeroEtudiant,
+      sujet: payload.subject,
+      corps: payload.body,
+      dateEnvoi: currentDate,
+      heureEnvoi,
+      type: getNotificationTypeForLevel(payload.level),
+      niveauMessage: payload.level,
+      joursRetard: payload.daysLate,
+      empruntId: emp.id,
       ouvrageId: ow.id,
-      dateInscription: currentDate,
-      statut: 'EN_ATTENTE'
+      ouvrageTitre: ow.titre,
+      exemplaireId: ex?.id,
+      exemplaireCode: ex?.codeQR,
+      adherentId: adh.id
     };
 
-    // Calculate rank and size
-    const updatedQueue = [...demandes, newDemande]
-      .filter(d => d.ouvrageId === ow.id && (d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE'))
-      .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-    const newRank = updatedQueue.findIndex(d => d.id === newDemandeId) + 1;
-    const totalSize = updatedQueue.length;
-
-    setDemandes(prev => [...prev, newDemande]);
-
-    return {
-      success: true,
-      demande: newDemande,
-      rang: newRank,
-      tailleFile: totalSize,
-      adherent: student,
-      ouvrage: ow
-    };
+    setNotifications(prev => [newNotif, ...prev]);
+    setEmprunts(prev => prev.map(e => e.id === empruntId ? {
+      ...e,
+      nbRappels: (e.nbRappels || 0) + 1,
+      dateDernierRappel: currentDate,
+      dernierNiveauMessage: payload.level,
+      dernierJourRetardMessage: payload.daysLate
+    } : e));
   };
 
-  // Manager cancels a request
-  const annulerDemande = (demandeId: string): { success: boolean; message?: string } => {
-    const dem = demandes.find(d => d.id === demandeId);
-    if (!dem) {
-      return { success: false, message: "Demande introuvable." };
-    }
+  // Enregistrement groupé pour un palier (avec instantané d'annulation en cas de décoche)
+  const recordGroupReminders = (
+    items: Array<{ empruntId: string; level: MessageLevel; subject: string; body: string; daysLate: number }>
+  ) => {
+    const now = new Date();
+    const heureEnvoi = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const newNotifications: EmailNotification[] = [];
+    const undoRecords: Array<{
+      empruntId: string;
+      notificationId: string;
+      previousNbRappels: number;
+      previousDateDernierRappel?: string;
+      previousDernierNiveauMessage?: MessageLevel;
+      previousDernierJourRetardMessage?: number;
+    }> = [];
+    const updatesById = new Map<string, { level: MessageLevel; daysLate: number }>();
 
-    if (dem.statut === 'NOTIFIEE' && dem.exemplaireReserveId) {
-      const copyId = dem.exemplaireReserveId;
-      const ex = getExemplaireById(copyId);
-      const ow = ex ? getOuvrageById(ex.ouvrageId) : getOuvrageById(dem.ouvrageId);
-
-      setDemandes(prev => {
-        const withoutCurrent = prev.map(d => d.id === demandeId ? { ...d, statut: 'ANNULEE' as StatutDemande } : d);
-        
-        const waitingDemands = withoutCurrent
-          .filter(d => d.ouvrageId === dem.ouvrageId && d.statut === 'EN_ATTENTE')
-          .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-
-        if (waitingDemands.length > 0 && ex && ow) {
-          const nextDem = waitingDemands[0];
-          const dateLimiteRetrait = addDaysToDate(currentDate, 1);
-          const nextStudent = getAdherentById(nextDem.adherentId);
-
-          const updatedDemands = withoutCurrent.map(d => d.id === nextDem.id ? {
-            ...d,
-            statut: 'NOTIFIEE' as StatutDemande,
-            dateNotification: currentDate,
-            dateLimiteRetrait,
-            exemplaireReserveId: copyId
-          } : d);
-
-          if (nextStudent) {
-            sendNotificationEmail({
-              destinataireEmail: nextStudent.emailAcademique,
-              destinataireNom: `${nextStudent.prenom} ${nextStudent.nom}`,
-              destinataireNumero: nextStudent.numeroEtudiant,
-              sujet: `Exemplaire disponible (File d'attente) : ${ow.titre}`,
-              corps: `Bonjour ${nextStudent.prenom},\n\nSuite à une annulation, un exemplaire physique de l'ouvrage "${ow.titre}" (Cote : ${ow.cote}) est disponible et vous est réservé pour une durée de 24 heures.\n\nEmplacement de rangement : Tiroir ${ex.emplacement.tiroir}, Rangée ${ex.emplacement.rangee}\nDate limite de retrait : ${dateLimiteRetrait}\n\nVeuillez vous présenter au guichet de la bibliothèque avec votre carte d'étudiant pour scanner et valider votre prêt.\nPassé ce délai de 24h, l'exemplaire sera proposé à l'étudiant suivant.`,
-              dateEnvoi: currentDate,
-              heureEnvoi: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-              type: 'RESERVATION_DISPONIBLE',
-              ouvrageId: ow.id,
-              ouvrageTitre: ow.titre,
-              exemplaireId: ex.id,
-              exemplaireCode: ex.codeQR,
-              emplacement: ex.emplacement,
-              dateLimiteRetrait,
-              adherentId: nextStudent.id
-            });
-          }
-
-          return updatedDemands;
-        } else {
-          if (ex) {
-            updateExemplaire(ex.id, { statut: 'DISPONIBLE' });
-          }
-          return withoutCurrent;
-        }
-      });
-
-      return { success: true, message: "Demande annulée. La réservation a été réattribuée au demandeur suivant." };
-    } else {
-      setDemandes(prev => prev.map(d => d.id === demandeId ? { ...d, statut: 'ANNULEE' as StatutDemande } : d));
-      return { success: true, message: "Demande de file d'attente annulée." };
-    }
-  };
-
-  // Automatic verification of expired 1-day reservations
-  const checkExpiredReservations = (targetDateStr?: string) => {
-    const effectiveDate = targetDateStr || currentDate;
-    const newEmails: EmailNotification[] = [];
-    const copiesToRevert: string[] = [];
-
-    setDemandes(prevDemandes => {
-      const notifiees = prevDemandes.filter(d => 
-        d.statut === 'NOTIFIEE' && 
-        d.dateLimiteRetrait && 
-        d.dateLimiteRetrait <= effectiveDate
-      );
-
-      if (notifiees.length === 0) return prevDemandes;
-
-      let nextDemandesState = [...prevDemandes];
-
-      for (const expired of notifiees) {
-        // 1. Mark expired request as EXPIREE (sort de la file sans seconde chance)
-        nextDemandesState = nextDemandesState.map(d => d.id === expired.id ? {
-          ...d,
-          statut: 'EXPIREE' as StatutDemande
-        } : d);
-
-        const copyId = expired.exemplaireReserveId;
-        const ex = copyId ? exemplaires.find(e => e.id === copyId) : undefined;
-        const ow = ex ? ouvrages.find(o => o.id === ex.ouvrageId) : ouvrages.find(o => o.id === expired.ouvrageId);
-
-        // 2. Look for the next waiting demand in queue
-        const waitingNext = nextDemandesState
-          .filter(d => d.ouvrageId === expired.ouvrageId && d.statut === 'EN_ATTENTE')
-          .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
-
-        if (waitingNext.length > 0 && copyId && ex && ow) {
-          const nextTarget = waitingNext[0];
-          const nextStudent = adherents.find(a => a.id === nextTarget.adherentId);
-          const newDeadline = addDaysToDate(effectiveDate, 1);
-
-          nextDemandesState = nextDemandesState.map(d => d.id === nextTarget.id ? {
-            ...d,
-            statut: 'NOTIFIEE' as StatutDemande,
-            dateNotification: effectiveDate,
-            dateLimiteRetrait: newDeadline,
-            exemplaireReserveId: copyId
-          } : d);
-
-          if (nextStudent) {
-            newEmails.push({
-              id: `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-              destinataireEmail: nextStudent.emailAcademique,
-              destinataireNom: `${nextStudent.prenom} ${nextStudent.nom}`,
-              destinataireNumero: nextStudent.numeroEtudiant,
-              sujet: `Exemplaire disponible (File d'attente) : ${ow.titre}`,
-              corps: `Bonjour ${nextStudent.prenom},\n\nLe délai de réservation de 24 heures de l'étudiant précédent a expiré. L'exemplaire physique de l'ouvrage "${ow.titre}" (Cote : ${ow.cote}) vous est maintenant réservé pour une durée de 24 heures calendaires.\n\nEmplacement de rangement : Tiroir ${ex.emplacement.tiroir}, Rangée ${ex.emplacement.rangee}\nDate limite impérative de retrait : ${newDeadline}\n\nVeuillez vous présenter au guichet de la bibliothèque avec votre carte d'étudiant pour scanner et valider votre prêt.\nPassé ce délai de 24h, l'exemplaire sera automatiquement réattribué à l'étudiant suivant dans la file d'attente.\n\nCordialement,\nLe Service des Prêts Universitaire`,
-              dateEnvoi: effectiveDate,
-              heureEnvoi: '08:00',
-              type: 'RESERVATION_DISPONIBLE',
-              ouvrageId: ow.id,
-              ouvrageTitre: ow.titre,
-              exemplaireId: ex.id,
-              exemplaireCode: ex.codeQR,
-              emplacement: ex.emplacement,
-              dateLimiteRetrait: newDeadline,
-              adherentId: nextStudent.id
-            });
-          }
-        } else if (copyId) {
-          copiesToRevert.push(copyId);
-        }
-      }
-
-      return nextDemandesState;
-    });
-
-    if (newEmails.length > 0) {
-      setNotifications(prev => [...newEmails, ...prev]);
-    }
-
-    if (copiesToRevert.length > 0) {
-      setExemplaires(prevEx => prevEx.map(e => copiesToRevert.includes(e.id) ? {
-        ...e,
-        statut: 'DISPONIBLE'
-      } : e));
-    }
-  };
-
-  // Automatic verification of overdue loan reminders
-  // 1er rappel 2 jours après dateRetourPrevue ; 2e rappel 2 jours après le premier (J+4)
-  const checkOverdueReminders = (targetDateStr?: string): { remindersCount: number } => {
-    const effectiveDate = targetDateStr || currentDate;
-    const newReminders: EmailNotification[] = [];
-    const updatedEmpruntsMap = new Map<string, { nbRappels: number; dateDernierRappel: string }>();
-
-    for (const emp of emprunts) {
-      if (emp.statut !== 'en_cours') continue;
-      if (emp.dateRetourPrevue >= effectiveDate) continue; // Not overdue
-
-      const daysLate = Math.floor(
-        (new Date(effectiveDate).getTime() - new Date(emp.dateRetourPrevue).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (daysLate <= 0) continue;
-
-      const nbRappels = emp.nbRappels || 0;
+    items.forEach((item, index) => {
+      const emp = emprunts.find(e => e.id === item.empruntId);
+      if (!emp) return;
       const adh = getAdherentById(emp.adherentId);
       const ow = getOuvrageById(emp.ouvrageId);
       const ex = getExemplaireById(emp.exemplaireId);
-      if (!adh || !ow) continue;
+      if (!adh || !ow) return;
 
-      const datePrevueFr = new Date(emp.dateRetourPrevue).toLocaleDateString('fr-FR');
+      const notificationId = `notif_${emp.id}_${Date.now()}_${index}_${Math.floor(Math.random() * 1000)}`;
+      newNotifications.push({
+        id: notificationId,
+        destinataireEmail: adh.emailAcademique,
+        destinataireNom: `${adh.prenom} ${adh.nom}`,
+        destinataireNumero: adh.numeroEtudiant,
+        sujet: item.subject,
+        corps: item.body,
+        dateEnvoi: currentDate,
+        heureEnvoi,
+        type: getNotificationTypeForLevel(item.level),
+        niveauMessage: item.level,
+        joursRetard: item.daysLate,
+        empruntId: emp.id,
+        ouvrageId: ow.id,
+        ouvrageTitre: ow.titre,
+        exemplaireId: ex?.id,
+        exemplaireCode: ex?.codeQR,
+        adherentId: adh.id
+      });
 
-      // Rule: 1er rappel 2 jours après dateRetourPrevue (daysLate >= 2)
-      if (nbRappels === 0 && daysLate >= 2) {
-        newReminders.push({
-          id: `notif_rap1_${emp.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-          destinataireEmail: adh.emailAcademique,
-          destinataireNom: `${adh.prenom} ${adh.nom}`,
-          destinataireNumero: adh.numeroEtudiant,
-          sujet: `1er Rappel de retard : ${ow.titre}`,
-          corps: `Bonjour ${adh.prenom},\n\nSauf erreur de notre part, l'emprunt de l'ouvrage "${ow.titre}" (Cote : ${ow.cote}, Exemplaire : ${ex?.codeQR || ''}) souscrit sous votre compte étudiant (${adh.numeroEtudiant}) est arrivé à échéance le ${datePrevueFr}.\n\nNombre de jours de retard constatés : ${daysLate} jour(s).\n\nConformément au règlement universitaire, tout retard non régularisé entraîne le blocage immédiat de vos nouveaux emprunts au guichet. Merci de rapporter cet exemplaire dans les meilleurs délais.\n\nCordialement,\nLe Service des Prêts Universitaire`,
-          dateEnvoi: effectiveDate,
-          heureEnvoi: '08:30',
-          type: 'RAPPEL_RETARD_1',
-          ouvrageId: ow.id,
-          ouvrageTitre: ow.titre,
-          exemplaireId: ex?.id,
-          exemplaireCode: ex?.codeQR,
-          adherentId: adh.id
-        });
+      undoRecords.push({
+        empruntId: emp.id,
+        notificationId,
+        previousNbRappels: emp.nbRappels || 0,
+        previousDateDernierRappel: emp.dateDernierRappel,
+        previousDernierNiveauMessage: emp.dernierNiveauMessage,
+        previousDernierJourRetardMessage: emp.dernierJourRetardMessage
+      });
 
-        updatedEmpruntsMap.set(emp.id, {
-          nbRappels: 1,
-          dateDernierRappel: effectiveDate
-        });
-      }
-      // Rule: 2e rappel 2 jours après le premier rappel (daysLate >= 4)
-      else if (nbRappels === 1 && daysLate >= 4) {
-        newReminders.push({
-          id: `notif_rap2_${emp.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-          destinataireEmail: adh.emailAcademique,
-          destinataireNom: `${adh.prenom} ${adh.nom}`,
-          destinataireNumero: adh.numeroEtudiant,
-          sujet: `2e et Dernier Rappel de retard : ${ow.titre}`,
-          corps: `Bonjour ${adh.prenom},\n\nCeci est le second rappel concernant le retard de restitution de l'ouvrage "${ow.titre}" (Cote : ${ow.cote}, Exemplaire : ${ex?.codeQR || ''}), dont la date prévue de retour était le ${datePrevueFr}.\n\nNombre de jours de retard : ${daysLate} jour(s).\n\nSans restitution immédiate, votre dossier sera transmis pour contact direct (« À contacter ») et vos droits d'emprunt demeurent entièrement suspendus.\n\nCordialement,\nLe Service des Prêts Universitaire`,
-          dateEnvoi: effectiveDate,
-          heureEnvoi: '08:30',
-          type: 'RAPPEL_RETARD_2',
-          ouvrageId: ow.id,
-          ouvrageTitre: ow.titre,
-          exemplaireId: ex?.id,
-          exemplaireCode: ex?.codeQR,
-          adherentId: adh.id
-        });
+      updatesById.set(emp.id, { level: item.level, daysLate: item.daysLate });
+    });
 
-        updatedEmpruntsMap.set(emp.id, {
-          nbRappels: 2,
-          dateDernierRappel: effectiveDate
-        });
-      }
-    }
-
-    if (updatedEmpruntsMap.size > 0) {
-      setEmprunts(prev => prev.map(e => {
-        const update = updatedEmpruntsMap.get(e.id);
-        if (update) {
+    if (newNotifications.length > 0) {
+      setNotifications(prev => [...newNotifications, ...prev]);
+      setEmprunts(prev =>
+        prev.map(e => {
+          const upd = updatesById.get(e.id);
+          if (!upd) return e;
           return {
             ...e,
-            nbRappels: update.nbRappels,
-            dateDernierRappel: update.dateDernierRappel
+            nbRappels: (e.nbRappels || 0) + 1,
+            dateDernierRappel: currentDate,
+            dernierNiveauMessage: upd.level,
+            dernierJourRetardMessage: upd.daysLate
           };
+        })
+      );
+    }
+
+    return undoRecords;
+  };
+
+  // Annulation d'un enregistrement groupé si le gestionnaire décoche « Envoyé »
+  const revertGroupReminders = (
+    records: Array<{
+      empruntId: string;
+      notificationId: string;
+      previousNbRappels: number;
+      previousDateDernierRappel?: string;
+      previousDernierNiveauMessage?: MessageLevel;
+      previousDernierJourRetardMessage?: number;
+    }>
+  ) => {
+    if (records.length === 0) return;
+    const notifIdSet = new Set(records.map(r => r.notificationId));
+    const restoreMap = new Map(records.map(r => [r.empruntId, r]));
+
+    setNotifications(prev => prev.filter(n => !notifIdSet.has(n.id)));
+    setEmprunts(prev =>
+      prev.map(e => {
+        const snap = restoreMap.get(e.id);
+        if (!snap) return e;
+        return {
+          ...e,
+          nbRappels: snap.previousNbRappels,
+          dateDernierRappel: snap.previousDateDernierRappel,
+          dernierNiveauMessage: snap.previousDernierNiveauMessage,
+          dernierJourRetardMessage: snap.previousDernierJourRetardMessage
+        };
+      })
+    );
+  };
+
+  // Marquer une sélection d'emprunts (J+7+) comme contactés hors application
+  const markLoansAsContacted = (empruntIds: string[]): { count: number } => {
+    if (empruntIds.length === 0) return { count: 0 };
+    const idSet = new Set(empruntIds);
+    let updatedCount = 0;
+
+    setEmprunts(prev => prev.map(e => {
+      if (idSet.has(e.id) && e.statut === 'en_cours' && !e.annule) {
+        updatedCount++;
+        return {
+          ...e,
+          contacte: true,
+          dateContact: currentDate
+        };
+      }
+      return e;
+    }));
+
+    return { count: empruntIds.length };
+  };
+
+  // Confirmation rangement en rayon (« Reclasser ») : sans effet sur les statuts
+  const markLoanReclasse = (empruntId?: string, codeQR?: string) => {
+    if (empruntId) {
+      setEmprunts(prev => prev.map(e => e.id === empruntId ? { ...e, reclasse: true } : e));
+    } else if (codeQR) {
+      // Pour un livre lu sur place (sans emprunt en cours) ou identifié par QR
+      const ex = exemplaires.find(e => e.codeQR.trim().toUpperCase() === codeQR.trim().toUpperCase());
+      if (ex) {
+        // Recherche du dernier emprunt éventuel
+        const lastLoan = emprunts.find(e => e.exemplaireId === ex.id);
+        if (lastLoan) {
+          setEmprunts(prev => prev.map(e => e.id === lastLoan.id ? { ...e, reclasse: true } : e));
         }
-        return e;
-      }));
+      }
     }
-
-    if (newReminders.length > 0) {
-      setNotifications(prev => [...newReminders, ...prev]);
-    }
-
-    return { remindersCount: newReminders.length };
   };
 
-  // Automated daily check (Contrôle automatique lancé à l'ouverture et au moins 1x par jour)
-  // Il traite les rappels de retard et les réservations expirées.
-  const runDailyChecks = (targetDateStr?: string): { expiredReservationsCount: number; remindersSentCount: number } => {
-    const effectiveDate = targetDateStr || currentDate;
-    checkExpiredReservations(effectiveDate);
-    const { remindersCount } = checkOverdueReminders(effectiveDate);
-    return {
-      expiredReservationsCount: 0,
-      remindersSentCount: remindersCount
-    };
-  };
-
-  const advanceOneDay = () => {
-    const nextDate = addDaysToDate(currentDate, 1);
-    setSimulatedDate(nextDate);
-    runDailyChecks(nextDate);
-  };
-
-  const advanceDays = (days: number) => {
-    const nextDate = addDaysToDate(currentDate, days);
-    setSimulatedDate(nextDate);
-    runDailyChecks(nextDate);
-  };
-
-  useEffect(() => {
-    // Run automated daily check at startup and whenever date changes
-    runDailyChecks(currentDate);
-  }, [currentDate]);
-
-  // Automated Return by Scan
+  // Automated Return by Scan : aucun choix d'état, exemplaire repasse à DISPONIBLE
   const returnByScan = (
-    exemplaireCodeOrId: string,
-    etat: 'bon' | 'abime'
+    exemplaireCodeOrId: string
   ) => {
     const cleanCode = exemplaireCodeOrId.trim().toUpperCase();
     const ex = exemplaires.find(e => e.codeQR.trim().toUpperCase() === cleanCode || e.id === exemplaireCodeOrId);
+    
     if (!ex) {
       return { 
         success: false, 
@@ -1579,142 +1560,29 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       setEmprunts(prev => prev.map(e => e.id === activeLoan.id ? {
         ...e,
         statut: 'rendu',
-        dateRetourEffective: currentDate,
-        etatAuRetour: etat === 'bon' ? 'bon' : 'abîmé'
+        dateRetourEffective: currentDate
       } : e));
-    } else {
-      // Rule 5: S'il n'y a pas d'emprunt en cours (livre lu sur place), afficher seulement l'emplacement sans modifier aucun statut.
-      return {
-        success: true,
-        hadActiveLoan: false,
-        exemplaire: ex,
-        emplacement: ex.emplacement,
-        ouvrage: ow,
-        isOverdue: false,
-        daysLate: 0,
-        isReservedForQueue: false
-      };
     }
 
-    // Physical copy condition check and waiting queue resolution
-    if (etat === 'bon') {
-      // Check if waiting queue is not empty for this book
-      const waitingDemands = demandes
-        .filter(d => d.ouvrageId === ex.ouvrageId && d.statut === 'EN_ATTENTE')
-        .sort((a, b) => a.dateInscription.localeCompare(b.dateInscription));
+    // Physical copy goes back to DISPONIBLE
+    updateExemplaire(ex.id, {
+      statut: 'DISPONIBLE'
+    });
+    const updatedEx: Exemplaire = {
+      ...ex,
+      statut: 'DISPONIBLE'
+    };
 
-      if (waitingDemands.length > 0 && ow) {
-        // Rule: AU RETOUR D'UN EXEMPLAIRE EN BON ÉTAT, SI LA FILE N'EST PAS VIDE
-        // 1. L'exemplaire passe à RESERVE au lieu de DISPONIBLE.
-        // 2. La première demande passe à NOTIFIEE, avec dateNotification et dateLimiteRetrait = notification + 1 jour.
-        // 3. Un e-mail est envoyé à l'e-mail académique de cet adhérent (titre, emplacement, date limite).
-        // 4. Le livre est rangé en tiroir normalement (pas de geste en plus).
-        const firstDemand = waitingDemands[0];
-        const dateLimiteRetrait = addDaysToDate(currentDate, 1);
-        const studentToNotify = getAdherentById(firstDemand.adherentId);
-
-        updateExemplaire(ex.id, {
-          statut: 'RESERVE',
-          etat: 'bon'
-        });
-
-        setDemandes(prev => prev.map(d => d.id === firstDemand.id ? {
-          ...d,
-          statut: 'NOTIFIEE',
-          dateNotification: currentDate,
-          dateLimiteRetrait,
-          exemplaireReserveId: ex.id
-        } : d));
-
-        if (studentToNotify) {
-          sendNotificationEmail({
-            destinataireEmail: studentToNotify.emailAcademique,
-            destinataireNom: `${studentToNotify.prenom} ${studentToNotify.nom}`,
-            destinataireNumero: studentToNotify.numeroEtudiant,
-            sujet: `Exemplaire disponible (File d'attente) : ${ow.titre}`,
-            corps: `Bonjour ${studentToNotify.prenom},\n\nUn exemplaire physique de l'ouvrage "${ow.titre}" (Cote : ${ow.cote}) vient d'être restitué au guichet.\nIl vous est exclusivement réservé pour une durée de 24 heures calendaires.\n\nEmplacement de rangement : Tiroir ${ex.emplacement.tiroir}, Rangée ${ex.emplacement.rangee}\nDate limite impérative de retrait : ${dateLimiteRetrait}\n\nVeuillez vous présenter au guichet de la bibliothèque avec votre carte d'étudiant pour scanner et enregistrer votre prêt.\nPassé ce délai de 24h, l'exemplaire sera automatiquement réattribué à l'étudiant suivant dans la file d'attente.\n\nCordialement,\nLe Service des Prêts Universitaire`,
-            dateEnvoi: currentDate,
-            heureEnvoi: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-            type: 'RESERVATION_DISPONIBLE',
-            ouvrageId: ow.id,
-            ouvrageTitre: ow.titre,
-            exemplaireId: ex.id,
-            exemplaireCode: ex.codeQR,
-            emplacement: ex.emplacement,
-            dateLimiteRetrait,
-            adherentId: studentToNotify.id
-          });
-        }
-
-        const updatedEx: Exemplaire = {
-          ...ex,
-          statut: 'RESERVE',
-          etat: 'bon'
-        };
-
-        return {
-          success: true,
-          hadActiveLoan: Boolean(activeLoan),
-          exemplaire: updatedEx,
-          emplacement: ex.emplacement,
-          ouvrage: ow,
-          adherent: student,
-          isOverdue,
-          daysLate,
-          isReservedForQueue: true,
-          reservedStudent: studentToNotify,
-          dateLimiteRetrait
-        };
-      } else {
-        // Queue is empty -> copy becomes DISPONIBLE
-        updateExemplaire(ex.id, {
-          statut: 'DISPONIBLE',
-          etat: 'bon'
-        });
-
-        const updatedEx: Exemplaire = {
-          ...ex,
-          statut: 'DISPONIBLE',
-          etat: 'bon'
-        };
-
-        return {
-          success: true,
-          hadActiveLoan: Boolean(activeLoan),
-          exemplaire: updatedEx,
-          emplacement: ex.emplacement,
-          ouvrage: ow,
-          adherent: student,
-          isOverdue,
-          daysLate,
-          isReservedForQueue: false
-        };
-      }
-    } else {
-      // Dommage constaté -> EN_REPARATION (etat: abîmé)
-      updateExemplaire(ex.id, {
-        statut: 'EN_REPARATION',
-        etat: 'abîmé'
-      });
-
-      const updatedEx: Exemplaire = {
-        ...ex,
-        statut: 'EN_REPARATION',
-        etat: 'abîmé'
-      };
-
-      return {
-        success: true,
-        hadActiveLoan: Boolean(activeLoan),
-        exemplaire: updatedEx,
-        emplacement: ex.emplacement,
-        ouvrage: ow,
-        adherent: student,
-        isOverdue,
-        daysLate,
-        isReservedForQueue: false
-      };
-    }
+    return {
+      success: true,
+      hadActiveLoan: Boolean(activeLoan),
+      exemplaire: updatedEx,
+      emplacement: ex.emplacement,
+      ouvrage: ow,
+      adherent: student,
+      isOverdue,
+      daysLate
+    };
   };
 
   // QR Scanning Router
@@ -1728,9 +1596,8 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       return { found: true, type: 'exemplaire', item: matchedEx };
     }
 
-    // Check if it's an Adherent QR or Numero Etudiant
+    // Check if it's a student card QR (numeroEtudiant)
     const matchedAdh = adherents.find(a => 
-      a.codeQR.trim().toUpperCase() === trimmed || 
       a.numeroEtudiant.trim().toUpperCase() === trimmed
     );
     if (matchedAdh) {
@@ -1751,23 +1618,18 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Stats for manager dashboard
   const stats = useMemo(() => {
     const totalOuvrages = ouvrages.length;
-    const nonDestroyedCopies = exemplaires.filter(e => e.statut !== 'DETRUIT');
-    const totalExemplaires = nonDestroyedCopies.length;
+    const totalExemplaires = exemplaires.length;
     const disponiblesEnRayon = exemplaires.filter(e => e.statut === 'DISPONIBLE').length;
-    const empruntsEnCours = emprunts.filter(e => e.statut === 'en_cours').length;
+    const empruntsEnCours = emprunts.filter(e => e.statut === 'en_cours' && !e.annule).length;
     const empruntsEnRetard = emprunts.filter(e => isEmpruntEnRetard(e)).length;
     const empruntsAContacter = emprunts.filter(e => isEmpruntAContacter(e)).length;
     const rupturesStock = ouvrages.filter(ow => {
       if (!ow.empruntable) return false;
-      const copies = exemplaires.filter(e => e.ouvrageId === ow.id && e.statut !== 'DETRUIT');
+      const copies = exemplaires.filter(e => e.ouvrageId === ow.id);
       const avail = copies.filter(e => e.statut === 'DISPONIBLE').length;
-      if (avail > 0) return false;
-      const hasDemandes = demandes.some(d => d.ouvrageId === ow.id && (d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE'));
-      return hasDemandes;
+      return avail === 0;
     }).length;
     const adherentsActifs = adherents.filter(a => a.statut === 'actif').length;
-    const demandesEnAttente = demandes.filter(d => d.statut === 'EN_ATTENTE' || d.statut === 'NOTIFIEE').length;
-    const exemplairesReserves = exemplaires.filter(e => e.statut === 'RESERVE').length;
     const notificationsTotal = notifications.length;
 
     return {
@@ -1779,40 +1641,31 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       empruntsAContacter,
       rupturesStock,
       adherentsActifs,
-      demandesEnAttente,
-      exemplairesReserves,
       notificationsTotal
     };
-  }, [ouvrages, exemplaires, emprunts, adherents, demandes, notifications, currentDate]);
+  }, [ouvrages, exemplaires, emprunts, adherents, notifications, currentDate]);
 
   const resetToDefaultData = () => {
-    if (window.confirm("Réinitialiser toutes les données aux valeurs de démonstration universitaires ?")) {
-      localStorage.removeItem(STORAGE_KEY_OUVRAGES);
-      localStorage.removeItem(STORAGE_KEY_EXEMPLAIRES);
-      localStorage.removeItem(STORAGE_KEY_ADHERENTS);
-      localStorage.removeItem(STORAGE_KEY_EMPRUNTS);
-      localStorage.removeItem(STORAGE_KEY_DEMANDES);
-      localStorage.removeItem(STORAGE_KEY_NOTIFICATIONS);
-      localStorage.removeItem(STORAGE_KEY_SIM_DATE);
-      setOuvrages(INITIAL_OUVRAGES);
-      setExemplaires(INITIAL_EXEMPLAIRES);
-      setAdherents(INITIAL_ADHERENTS);
-      setEmprunts(INITIAL_EMPRUNTS);
-      setDemandes(INITIAL_DEMANDES);
-      setNotifications(INITIAL_NOTIFICATIONS);
-      setSimulatedDateState(null);
-    }
+    localStorage.removeItem(STORAGE_KEY_OUVRAGES);
+    localStorage.removeItem(STORAGE_KEY_EXEMPLAIRES);
+    localStorage.removeItem(STORAGE_KEY_ADHERENTS);
+    localStorage.removeItem(STORAGE_KEY_EMPRUNTS);
+    localStorage.removeItem(STORAGE_KEY_NOTIFICATIONS);
+    setOuvrages(INITIAL_OUVRAGES);
+    setExemplaires(INITIAL_EXEMPLAIRES);
+    setAdherents(INITIAL_ADHERENTS);
+    setEmprunts(INITIAL_EMPRUNTS);
+    setNotifications(INITIAL_NOTIFICATIONS);
   };
 
   const exportDatabaseJSON = () => {
     const backup = {
       exportedAt: new Date().toISOString(),
-      simulatedDate: currentDate,
+      dateExport: currentDate,
       ouvrages,
       exemplaires,
       adherents,
       emprunts,
-      demandes,
       notifications
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -1823,6 +1676,82 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const syncLocalCovers = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+    let updatedCount = 0;
+    const updated = ouvrages.map((o) => {
+      if (LOCAL_COVERS_MAP[o.id]) {
+        updatedCount++;
+        return { ...o, coverUrl: LOCAL_COVERS_MAP[o.id] };
+      }
+      return o;
+    });
+
+    setOuvrages(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_OUVRAGES, JSON.stringify(updated));
+    } catch (err) {
+      console.warn("Erreur d'écriture localStorage:", err);
+    }
+
+    // Synchronisation Firestore
+    try {
+      const { db } = await import('../firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
+      for (const ow of updated) {
+        if (LOCAL_COVERS_MAP[ow.id]) {
+          await setDoc(
+            doc(db, 'ouvrages', ow.id),
+            {
+              id: ow.id,
+              titre: ow.titre,
+              coverUrl: LOCAL_COVERS_MAP[ow.id],
+              updatedAt: new Date().toISOString()
+            },
+            { merge: true }
+          );
+        }
+      }
+    } catch (err: any) {
+      console.warn("Synchronisation Firestore (mode hors-ligne ou non disponible):", err);
+    }
+
+    return { success: true, count: updatedCount };
+  };
+
+  // Mise à jour automatique des 20 couvertures locales vers Firestore au démarrage
+  useEffect(() => {
+    let isCancelled = false;
+    const autoSyncToFirestore = async () => {
+      try {
+        const { db } = await import('../firebase');
+        const { doc, setDoc } = await import('firebase/firestore');
+        for (const [id, coverUrl] of Object.entries(LOCAL_COVERS_MAP)) {
+          if (isCancelled) break;
+          const ow = INITIAL_OUVRAGES.find(o => o.id === id);
+          if (ow) {
+            await setDoc(
+              doc(db, 'ouvrages', id),
+              {
+                id,
+                titre: ow.titre,
+                coverUrl,
+                updatedAt: new Date().toISOString()
+              },
+              { merge: true }
+            );
+          }
+        }
+      } catch (err) {
+        console.warn("Mise à jour automatique Firestore en arrière-plan:", err);
+      }
+    };
+
+    autoSyncToFirestore();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   return (
     <LibraryContext.Provider
@@ -1836,16 +1765,13 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
         activeManagerTab,
         setActiveManagerTab,
         currentDate,
-        isSimulatedDate,
-        setSimulatedDate,
-        resetSimulatedDate,
-        advanceOneDay,
-        advanceDays,
+        allowedAcademicDomain,
+        setAllowedAcademicDomain,
+        ensureStudentAdherent,
         ouvrages,
         exemplaires,
         adherents,
         emprunts,
-        demandes,
         notifications,
         getOuvrageById,
         getExemplaireById,
@@ -1860,31 +1786,25 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
         isEmpruntEnRetard,
         getJoursDeRetard,
         isEmpruntAContacter,
-        runDailyChecks,
+        recordManualReminder,
+        recordGroupReminders,
+        revertGroupReminders,
+        markLoansAsContacted,
         loanDurationDays,
         setLoanDurationDays,
         addOuvrage,
+        addBulkOuvrages,
         updateOuvrage,
         addExemplairesToOuvrage,
         updateExemplaire,
-        reformeExemplaire,
-        reparerExemplaire,
-        declarerDommageRayon,
         declarerPerdu,
         declarerRetrouve,
         addLoan,
+        cancelLoan,
         addLoanByScan,
         returnLoan,
+        markLoanReclasse,
         returnByScan,
-        inscrireFileAttente,
-        annulerDemande,
-        getQueueForOuvrage,
-        getStudentRankInQueue,
-        checkExpiredReservations,
-        activeQueueModalOuvrageId,
-        setActiveQueueModalOuvrageId,
-        isNotificationsModalOpen,
-        setIsNotificationsModalOpen,
         isQRScannerOpen,
         setIsQRScannerOpen,
         isScanReturnOpen,
@@ -1898,6 +1818,8 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
         setSelectedAdherent,
         activePrintLabelsOuvrageId,
         setActivePrintLabelsOuvrageId,
+        activePrintLabelExemplaireIds,
+        setActivePrintLabelExemplaireIds,
         activeReceiptEmprunt,
         setActiveReceiptEmprunt,
         isNewLoanOpen,
@@ -1915,7 +1837,8 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
         importStudentsFromCSV,
         stats,
         resetToDefaultData,
-        exportDatabaseJSON
+        exportDatabaseJSON,
+        syncLocalCovers
       }}
     >
       {children}

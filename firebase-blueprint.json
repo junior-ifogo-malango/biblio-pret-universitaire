@@ -1,0 +1,34 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profil utilisateur étudiant authentifié via Google",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Identifiant Firebase Auth de l'étudiant"
+        },
+        "email": {
+          "type": "string",
+          "description": "Adresse e-mail Google validée"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Nom complet de l'étudiant Google"
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "Date de dernière connexion"
+        }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Documents de profil privé des étudiants"
+    }
+  }
+}

@@ -58,7 +58,9 @@ export const PrintableQRLabelsModal: React.FC<PrintableQRLabelsModalProps> = ({
             <div>
               <h3 className="text-sm font-bold font-serif">Planche d'Étiquettes QR Codes des Exemplaires</h3>
               <p className="text-xs text-slate-400">
-                {ouvrage ? `Exemplaires de "${ouvrage.titre}" (${exemplaires.length})` : `Tous les exemplaires actifs (${exemplaires.length})`}
+                {ouvrage
+                  ? `Exemplaires de "${ouvrage.titre}" (${exemplaires.length})`
+                  : `Nouveaux exemplaires sélectionnés (${exemplaires.length})`}
               </p>
             </div>
           </div>
@@ -115,9 +117,7 @@ export const PrintableQRLabelsModal: React.FC<PrintableQRLabelsModalProps> = ({
                   <div className="w-full mt-1 pt-1 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-500 font-mono">
                     <span>Tiroir: <strong className="text-slate-800">{ex.emplacement.tiroir}</strong></span>
                     <span>Rangée: <strong className="text-slate-800">{ex.emplacement.rangee}</strong></span>
-                    <span className={`uppercase font-bold ${ex.etat === 'bon' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                      {ex.etat}
-                    </span>
+
                   </div>
                 </div>
               );

@@ -17,23 +17,16 @@ export interface Emplacement {
 
 export type StatutExemplaire = 
   | 'DISPONIBLE' 
-  | 'RESERVE' 
   | 'EMPRUNTE' 
-  | 'EN_REPARATION' 
-  | 'PERDU' 
-  | 'DETRUIT';
+  | 'PERDU';
 
-export type EtatExemplaire = 'bon' | 'abîmé';
 
 export interface Exemplaire {
   id: string;
   ouvrageId: string;
   codeQR: string; // Ex: "EX-1001"
-  etat: EtatExemplaire;
   statut: StatutExemplaire;
   emplacement: Emplacement;
-  dateReforme?: string;
-  motifReforme?: string;
 }
 
 export interface Ouvrage {
@@ -50,6 +43,7 @@ export interface Ouvrage {
   empruntable: boolean; // faux pour consultation sur place uniquement
   coverGradient?: string;
   coverUrl?: string;
+  sommaire?: string;
 }
 
 export type StatutAdherent = 'actif' | 'resilie';
@@ -60,7 +54,8 @@ export interface Adherent {
   nom: string;
   prenom: string;
   emailAcademique: string;
-  codeQR: string; // Égal au numeroEtudiant
+  filiere?: string;
+  niveau?: string;
   dateInscription: string;
   dateExpiration: string; // Fin de l'année universitaire (ex: YYYY-08-31)
   statut: StatutAdherent;
@@ -68,6 +63,8 @@ export interface Adherent {
 }
 
 export type StatutEmprunt = 'en_cours' | 'rendu' | 'perdu';
+
+export type MessageLevel = 'J+1' | 'J+2' | 'J+3-4' | 'J+5' | 'J+6' | 'J+7+';
 
 export interface Emprunt {
   id: string;
@@ -80,25 +77,27 @@ export interface Emprunt {
   dateRetourEffective?: string; // YYYY-MM-DD
   nbRappels: number;
   dateDernierRappel?: string;
+  dernierNiveauMessage?: MessageLevel;
+  dernierJourRetardMessage?: number;
+  contacte?: boolean;
+  dateContact?: string;
+  annule?: boolean; // vrai si annulé suite à une erreur de scan (jamais supprimé)
   statut: StatutEmprunt;
-  etatAuRetour?: EtatExemplaire;
+  reclasse?: boolean; // vrai si confirmé rangé en rayon par le gestionnaire
   notes?: string;
 }
 
-export type StatutDemande = 'EN_ATTENTE' | 'NOTIFIEE' | 'SERVIE' | 'EXPIREE' | 'ANNULEE';
 
-export interface DemandeAttente {
-  id: string;
-  adherentId: string;
-  ouvrageId: string;
-  dateInscription: string;
-  statut: StatutDemande;
-  dateNotification?: string;
-  dateLimiteRetrait?: string;
-  exemplaireReserveId?: string;
-}
-
-export type TypeNotification = 'RESERVATION_DISPONIBLE' | 'RAPPEL_RETARD_1' | 'RAPPEL_RETARD_2';
+export type TypeNotification =
+  | 'MESSAGE_J1'
+  | 'MESSAGE_J2'
+  | 'MESSAGE_J3_4'
+  | 'MESSAGE_J5'
+  | 'MESSAGE_J6'
+  | 'MESSAGE_J7_PLUS'
+  | 'RAPPEL_RETARD_1'
+  | 'RAPPEL_RETARD_2'
+  | 'RAPPEL_RETARD_3';
 
 export interface EmailNotification {
   id: string;
@@ -110,12 +109,14 @@ export interface EmailNotification {
   dateEnvoi: string; // YYYY-MM-DD
   heureEnvoi?: string;
   type: TypeNotification;
+  niveauMessage?: MessageLevel;
+  joursRetard?: number;
+  empruntId?: string;
   ouvrageId: string;
   ouvrageTitre: string;
   exemplaireId?: string;
   exemplaireCode?: string;
   emplacement?: Emplacement;
-  dateLimiteRetrait?: string;
   adherentId: string;
 }
 

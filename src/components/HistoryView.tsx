@@ -1,57 +1,117 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  History, 
-  Search, 
-  CheckCircle2, 
-  Download, 
-  MapPin
+import {
+  History,
+  Search,
+  Download,
+  Clock
 } from 'lucide-react';
 import { useLibrary } from '../context/LibraryContext';
-import { EtatExemplaire } from '../types';
+import { Emprunt } from '../types';
+import { formatShortLoanNumber } from '../utils/overdueUtils';
+import { LoanDetailModal } from './LoanDetailModal';
 
 export const HistoryView: React.FC = () => {
   const { emprunts, getOuvrageById, getExemplaireById, getAdherentById, exportDatabaseJSON } = useLibrary();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [etatFilter, setEtatFilter] = useState<'all' | EtatExemplaire>('all');
+  const [detailLoan, setDetailLoan] = useState<Emprunt | null>(null);
 
-  const returnedLoans = useMemo(() => {
-    return emprunts.filter(l => {
-      if (l.statut !== 'rendu') return false;
-      if (etatFilter !== 'all' && l.etatAuRetour !== etatFilter) return false;
+  // 1. Activité récente (liste chronologique, la plus récente en premier)
+  const recentActivity = useMemo(() => {
+    const events: Array<{
+      id: string;
+      type: 'emprunt' | 'retour';
+      rawDate: string;
+      ouvrageTitre: string;
+      adherentNom: string;
+      adherentNumero: string;
+      label: string;
+    }> = [];
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const ow = getOuvrageById(l.ouvrageId);
-        const ex = getExemplaireById(l.exemplaireId);
-        const adh = getAdherentById(l.adherentId);
+    for (const loan of emprunts) {
+      if (loan.annule) continue;
+      const ow = getOuvrageById(loan.ouvrageId);
+      const adh = getAdherentById(loan.adherentId);
+      const nomComplet = adh ? `${adh.prenom} ${adh.nom}` : 'Étudiant';
+      const numEtudiant = adh?.numeroEtudiant || '';
+      const titre = ow?.titre || 'Ouvrage inconnu';
 
-        const matchOuvrage = ow && (
-          ow.titre.toLowerCase().includes(q) ||
-          ow.auteur.toLowerCase().includes(q) ||
-          ow.cote.toLowerCase().includes(q)
-        );
-
-        const matchAdherent = adh && (
-          adh.nom.toLowerCase().includes(q) ||
-          adh.prenom.toLowerCase().includes(q) ||
-          adh.numeroEtudiant.toLowerCase().includes(q)
-        );
-
-        const matchCopy = ex && ex.codeQR.toLowerCase().includes(q);
-
-        if (!matchOuvrage && !matchAdherent && !matchCopy && !l.loanNumber.toLowerCase().includes(q)) {
-          return false;
-        }
+      if (loan.statut === 'rendu' && loan.dateRetourEffective) {
+        events.push({
+          id: `${loan.id}-retour`,
+          type: 'retour',
+          rawDate: loan.dateRetourEffective,
+          ouvrageTitre: titre,
+          adherentNom: nomComplet,
+          adherentNumero: numEtudiant,
+          label: 'Retour enregistré'
+        });
       }
 
-      return true;
-    }).sort((a, b) => (b.dateRetourEffective || '').localeCompare(a.dateRetourEffective || ''));
-  }, [emprunts, etatFilter, searchQuery, getOuvrageById, getExemplaireById, getAdherentById]);
+      if (loan.dateEmprunt) {
+        events.push({
+          id: `${loan.id}-emprunt`,
+          type: 'emprunt',
+          rawDate: loan.dateEmprunt,
+          ouvrageTitre: titre,
+          adherentNom: nomComplet,
+          adherentNumero: numEtudiant,
+          label: loan.statut === 'rendu'
+            ? 'Emprunt initial'
+            : `Emprunt en cours (échéance : ${new Date(loan.dateRetourPrevue).toLocaleDateString('fr-FR')})`
+        });
+      }
+    }
+
+    return events.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
+  }, [emprunts, getOuvrageById, getAdherentById]);
+
+  // 2. Retours filtrés pour la table de traçabilité
+  const returnedLoans = useMemo(() => {
+    return emprunts
+      .filter(l => {
+        if (l.statut !== 'rendu' || l.annule) return false;
+
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const ow = getOuvrageById(l.ouvrageId);
+          const ex = getExemplaireById(l.exemplaireId);
+          const adh = getAdherentById(l.adherentId);
+          const shortNum = formatShortLoanNumber(l.loanNumber).toLowerCase();
+
+          const matchOuvrage =
+            ow &&
+            (ow.titre.toLowerCase().includes(q) ||
+              ow.auteur.toLowerCase().includes(q) ||
+              ow.cote.toLowerCase().includes(q));
+
+          const matchAdherent =
+            adh &&
+            (adh.nom.toLowerCase().includes(q) ||
+              adh.prenom.toLowerCase().includes(q) ||
+              adh.numeroEtudiant.toLowerCase().includes(q));
+
+          const matchCopy = ex && ex.codeQR.toLowerCase().includes(q);
+
+          if (
+            !matchOuvrage &&
+            !matchAdherent &&
+            !matchCopy &&
+            !l.loanNumber.toLowerCase().includes(q) &&
+            !shortNum.includes(q)
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) => (b.dateRetourEffective || '').localeCompare(a.dateRetourEffective || ''));
+  }, [emprunts, searchQuery, getOuvrageById, getExemplaireById, getAdherentById]);
 
   // Export CSV
   const handleExportCSV = () => {
-    const headers = ['N° Prêt', 'Ouvrage', 'Cote', 'Code QR Exemplaire', 'Tiroir', 'Rangée', 'Étudiant', 'N° Étudiant', 'Date Emprunt', 'Échéance', 'Date Retour Effective', 'État au Retour', 'Remarques'];
+    const headers = ['N° Prêt', 'Ouvrage', 'Cote', 'Code QR Exemplaire', 'Tiroir', 'Rangée', 'Étudiant', 'N° Étudiant', 'Date Emprunt', 'Échéance', 'Date Retour Effective', 'Remarques'];
     const rows = returnedLoans.map(l => {
       const ow = getOuvrageById(l.ouvrageId);
       const ex = getExemplaireById(l.exemplaireId);
@@ -68,7 +128,6 @@ export const HistoryView: React.FC = () => {
         l.dateEmprunt,
         l.dateRetourPrevue,
         l.dateRetourEffective || '',
-        l.etatAuRetour || '',
         `"${l.notes || ''}"`
       ];
     });
@@ -84,29 +143,97 @@ export const HistoryView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+    <div className="space-y-6 pb-12 font-sans">
+      {/* 1. ACTIVITÉ RÉCENTE EN TÊTE DE PAGE */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-slate-500" />
+            <h2 className="text-base font-bold text-slate-900">
+              Activité récente
+            </h2>
+          </div>
+          {recentActivity.length > 0 && (
+            <span className="text-xs text-slate-500 font-medium">
+              {recentActivity.length} mouvement{recentActivity.length > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        {recentActivity.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-sm">
+            Aucun mouvement enregistré
+          </div>
+        ) : (
+          <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+            {recentActivity.map((item) => (
+              <div
+                key={item.id}
+                className="px-5 py-3 flex items-center justify-between gap-3 text-xs hover:bg-slate-50/60 transition"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: item.type === 'retour' ? '#15803D' : '#1E3A5F'
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-900 truncate">
+                        {item.ouvrageTitre}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.type === 'retour'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-sky-50 text-sky-700 border border-sky-200'
+                        }`}
+                      >
+                        {item.type === 'retour' ? 'Retour' : 'Emprunt'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                      {item.adherentNom} {item.adherentNumero ? `(${item.adherentNumero})` : ''} · {item.label}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-400 font-mono shrink-0 whitespace-nowrap">
+                  {new Date(item.rawDate).toLocaleDateString('fr-FR', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 2. REGISTRE DES RESTITUTIONS */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
         <div>
-          <h1 className="text-2xl font-bold font-serif text-slate-900">
+          <h1 className="text-lg font-bold text-slate-900">
             Journal des Restitutions & Traçabilité
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Registre officiel des retours d'exemplaires et constats d'état physique.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Registre officiel des retours d'exemplaires.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
             <span>Exporter en CSV</span>
           </button>
           <button
             onClick={exportDatabaseJSON}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-2xs transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-amber-300" />
             <span>Sauvegarde Globale</span>
@@ -114,62 +241,48 @@ export const HistoryView: React.FC = () => {
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Recherche */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par ouvrage, N° étudiant, QR code..."
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/50 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+            placeholder="Rechercher par ouvrage, étudiant, N° de prêt..."
+            className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50/50 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
           />
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <span className="text-xs text-slate-500">Filtrer par état au retour :</span>
-          <select
-            value={etatFilter}
-            onChange={(e) => setEtatFilter(e.target.value as any)}
-            className="text-xs font-medium rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus:outline-hidden"
-          >
-            <option value="all">Tous les retours</option>
-            <option value="bon">Bon état</option>
-            <option value="abîmé">Abîmé</option>
-          </select>
         </div>
       </div>
 
-      {/* Table with Sticky Header and Compact Density */}
+      {/* Tableau simplifié à 6 colonnes */}
       {returnedLoans.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/90 text-slate-500 shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+        <div className="p-12 text-center bg-white rounded-xl border border-slate-200 text-slate-500 shadow-xs">
+          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
             <History className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-slate-800 font-serif">Aucune restitution enregistrée</h3>
+          <h3 className="text-sm font-bold text-slate-800">Aucune restitution enregistrée</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4 leading-relaxed">
             Aucun retour d'exemplaire ne correspond au filtre ou à la recherche.
           </p>
           <button
-            onClick={() => { setSearchQuery(''); setEtatFilter('all'); }}
-            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs"
+            onClick={() => setSearchQuery('')}
+            className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
           >
             Réinitialiser les filtres
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
             <table className="w-full text-left text-xs text-slate-600 border-collapse">
               <thead className="sticky top-0 z-10 bg-slate-100 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200 shadow-2xs">
                 <tr>
-                  <th className="py-2.5 px-3.5 bg-slate-100">Date Retour</th>
-                  <th className="py-2.5 px-3.5 bg-slate-100">N° Prêt</th>
-                  <th className="py-2.5 px-3.5 bg-slate-100">Ouvrage & Exemplaire</th>
+                  <th className="py-2.5 px-3.5 bg-slate-100">Date de retour</th>
+                  <th className="py-2.5 px-3.5 bg-slate-100">N° de prêt</th>
+                  <th className="py-2.5 px-3.5 bg-slate-100">Ouvrage</th>
                   <th className="py-2.5 px-3.5 bg-slate-100">Étudiant</th>
                   <th className="py-2.5 px-3.5 bg-slate-100">Emplacement</th>
-                  <th className="py-2.5 px-3.5 bg-slate-100">État Constaté</th>
                   <th className="py-2.5 px-3.5 bg-slate-100">Remarques</th>
                 </tr>
               </thead>
@@ -180,41 +293,34 @@ export const HistoryView: React.FC = () => {
                   const adh = getAdherentById(loan.adherentId);
 
                   return (
-                    <tr key={loan.id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-2.5 px-3.5 font-semibold text-slate-900 whitespace-nowrap">
+                    <tr
+                      key={loan.id}
+                      onClick={() => setDetailLoan(loan)}
+                      className="hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      <td className="py-3 px-3.5 font-semibold text-slate-900 whitespace-nowrap font-mono">
                         {loan.dateRetourEffective ? new Date(loan.dateRetourEffective).toLocaleDateString('fr-FR') : '-'}
                       </td>
 
-                      <td className="py-2.5 px-3.5 font-mono font-bold text-slate-700 whitespace-nowrap">
-                        {loan.loanNumber}
+                      <td className="py-3 px-3.5 font-mono font-bold text-slate-700 whitespace-nowrap">
+                        {formatShortLoanNumber(loan.loanNumber)}
                       </td>
 
-                      <td className="py-2.5 px-3.5">
-                        <div className="font-bold text-slate-800 leading-snug">{ow?.titre}</div>
-                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                          <span className="font-bold text-amber-800 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">{ex?.codeQR}</span> • Cote: {ow?.cote}
+                      <td className="py-3 px-3.5">
+                        <div className="font-bold text-slate-800 leading-snug">
+                          {ow?.titre || 'Ouvrage inconnu'}
                         </div>
                       </td>
 
-                      <td className="py-2.5 px-3.5 whitespace-nowrap">
-                        <div className="font-semibold text-slate-800">{adh?.prenom} {adh?.nom}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{adh?.numeroEtudiant}</div>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-800">
+                        <strong className="font-bold">{adh?.nom.toUpperCase()}</strong> {adh?.prenom}
                       </td>
 
-                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                        {ex?.emplacement.tiroir}, {ex?.emplacement.rangee}
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
+                        {ex ? `${ex.emplacement.tiroir}, ${ex.emplacement.rangee}` : '—'}
                       </td>
 
-                      <td className="py-2.5 px-3.5 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                          loan.etatAuRetour === 'bon' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-100 text-amber-900'
-                        }`}>
-                          <CheckCircle2 className="w-3 h-3" />
-                          {loan.etatAuRetour === 'bon' ? 'Bon état' : 'Abîmé'}
-                        </span>
-                      </td>
-
-                      <td className="py-2.5 px-3.5 text-slate-500 italic text-[11px] max-w-xs truncate">
+                      <td className="py-3 px-3.5 text-slate-500 italic text-[11px] max-w-xs truncate">
                         {loan.notes || '—'}
                       </td>
                     </tr>
@@ -226,6 +332,8 @@ export const HistoryView: React.FC = () => {
         </div>
       )}
 
+      {/* Pop-up détail en lecture seule */}
+      <LoanDetailModal loan={detailLoan} onClose={() => setDetailLoan(null)} />
     </div>
   );
 };

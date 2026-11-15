@@ -7,26 +7,23 @@ import {
   MapPin, 
   CheckCircle2, 
   AlertTriangle, 
-  Wrench, 
-  RotateCcw, 
   Keyboard,
   Maximize2,
   Minimize2
 } from 'lucide-react';
 import { useLibrary } from '../context/LibraryContext';
-import { Exemplaire, Ouvrage, Adherent, Emprunt } from '../types';
+import { Exemplaire, Ouvrage, Adherent } from '../types';
 
 export const ScanReturnModal: React.FC = () => {
   const { 
     isScanReturnOpen, 
     setIsScanReturnOpen, 
     returnByScan, 
+    markLoanReclasse,
     exemplaires, 
     getOuvrageById, 
     emprunts, 
-    getAdherentById,
-    isEmpruntEnRetard,
-    getJoursDeRetard
+    getAdherentById
   } = useLibrary();
 
   const [scannedCopyCode, setScannedCopyCode] = useState<string>('');
@@ -39,12 +36,7 @@ export const ScanReturnModal: React.FC = () => {
     adherent?: Adherent;
     isOverdue?: boolean;
     daysLate?: number;
-    etatChoisi: 'bon' | 'abime';
-    isReservedForQueue?: boolean;
-    reservedStudent?: Adherent;
-    dateLimiteRetrait?: string;
   } | null>(null);
-
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Video scanner refs
@@ -61,9 +53,7 @@ export const ScanReturnModal: React.FC = () => {
       resetState();
       return;
     }
-
     startCamera();
-
     return () => {
       stopCamera();
     };
@@ -127,7 +117,6 @@ export const ScanReturnModal: React.FC = () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(imgData.data, imgData.width, imgData.height, {
         inversionAttempts: 'dontInvert'
@@ -157,27 +146,8 @@ export const ScanReturnModal: React.FC = () => {
 
     setScannedCopyCode(ex.codeQR);
 
-    // Rule 5: S'il n'y a pas d'emprunt en cours (livre lu sur place), afficher seulement l'emplacement sans modifier aucun statut
-    const activeLoan = emprunts.find(e => e.exemplaireId === ex.id && e.statut === 'en_cours');
-    if (!activeLoan) {
-      const ow = getOuvrageById(ex.ouvrageId);
-      setReturnResult({
-        hadActiveLoan: false,
-        exemplaire: ex,
-        emplacement: ex.emplacement,
-        ouvrage: ow,
-        isOverdue: false,
-        daysLate: 0,
-        etatChoisi: 'bon',
-        isReservedForQueue: false
-      });
-    }
-  };
-
-  const handleConfirmReturn = (etatChoisi: 'bon' | 'abime') => {
-    setErrorMessage(null);
-    const res = returnByScan(scannedCopyCode, etatChoisi);
-
+    // Exécution directe du retour : aucun choix d'état
+    const res = returnByScan(ex.codeQR);
     if (!res.success) {
       setErrorMessage(res.error || "Erreur lors du retour.");
       return;
@@ -191,13 +161,20 @@ export const ScanReturnModal: React.FC = () => {
         ouvrage: res.ouvrage,
         adherent: res.adherent,
         isOverdue: res.isOverdue,
-        daysLate: res.daysLate,
-        etatChoisi,
-        isReservedForQueue: res.isReservedForQueue,
-        reservedStudent: res.reservedStudent,
-        dateLimiteRetrait: res.dateLimiteRetrait
+        daysLate: res.daysLate
       });
     }
+  };
+
+  const handleReclasser = () => {
+    if (returnResult) {
+      const activeOrRecentLoan = emprunts.find(e => 
+        e.exemplaireId === returnResult.exemplaire.id && 
+        (e.statut === 'rendu' || e.statut === 'en_cours')
+      );
+      markLoanReclasse(activeOrRecentLoan?.id, returnResult.exemplaire.codeQR);
+    }
+    handleClose();
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -216,18 +193,6 @@ export const ScanReturnModal: React.FC = () => {
   };
 
   if (!isScanReturnOpen) return null;
-
-  // Resolved copy preview before choice
-  const targetExemplaire = scannedCopyCode
-    ? exemplaires.find(e => e.codeQR.trim().toUpperCase() === scannedCopyCode.trim().toUpperCase())
-    : null;
-  const targetOuvrage = targetExemplaire ? getOuvrageById(targetExemplaire.ouvrageId) : null;
-  const targetActiveLoan = targetExemplaire
-    ? emprunts.find(e => e.exemplaireId === targetExemplaire.id && e.statut === 'en_cours')
-    : null;
-  const targetStudent = targetActiveLoan ? getAdherentById(targetActiveLoan.adherentId) : null;
-  const isLoanLate = targetActiveLoan ? isEmpruntEnRetard(targetActiveLoan) : false;
-  const daysLateCount = isLoanLate && targetActiveLoan ? getJoursDeRetard(targetActiveLoan.dateRetourPrevue) : 0;
 
   return (
     <div className={`fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-center justify-center ${
@@ -280,14 +245,14 @@ export const ScanReturnModal: React.FC = () => {
               </div>
               <button
                 onClick={handleScanAnother}
-                className="px-2.5 py-1 bg-rose-600 text-white rounded font-bold text-[10px]"
+                className="min-h-[44px] px-3 py-1.5 bg-rose-600 text-white rounded-lg font-bold text-xs"
               >
                 Réessayer
               </button>
             </div>
           )}
 
-          {/* Result view with "Ranger : Tiroir X, Rangée Y" */}
+          {/* Result view with "Ranger : tiroir X, rangée Y" and "Reclasser" */}
           {returnResult ? (
             <div className="p-6 text-center space-y-4 animate-in fade-in">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center shadow-inner">
@@ -297,8 +262,8 @@ export const ScanReturnModal: React.FC = () => {
               <div>
                 <h3 className="text-base font-bold font-serif text-slate-900">
                   {returnResult.hadActiveLoan 
-                    ? "Retour Validé & Clôturé !" 
-                    : "Livre Lu sur Place (Aucun emprunt actif)"}
+                    ? "Retour validé !" 
+                    : "Livre lu sur place (aucun emprunt actif)"}
                 </h3>
                 {returnResult.hadActiveLoan && returnResult.adherent && (
                   <p className="text-[11px] text-slate-500 mt-0.5">
@@ -310,157 +275,39 @@ export const ScanReturnModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Crucial guideline: Afficher « Ranger : tiroir X, rangée Y » pour un exemplaire disponible ou réservé */}
-              {returnResult.etatChoisi === 'bon' ? (
-                <div className="p-5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-slate-900 space-y-2 shadow-xs">
-                  <span className="text-[11px] uppercase font-extrabold tracking-wider text-amber-800">
-                    Consigne de rangement en rayon
-                  </span>
-                  <div className="text-2xl font-extrabold font-mono text-amber-950 flex items-center justify-center gap-2">
-                    <MapPin className="w-6 h-6 text-amber-600" />
-                    <span>Ranger : Tiroir {returnResult.emplacement.tiroir}, Rangée {returnResult.emplacement.rangee}</span>
-                  </div>
-
-                  {returnResult.isReservedForQueue && returnResult.reservedStudent ? (
-                    <div className="mt-2 p-3 bg-blue-100/80 border border-blue-300 rounded-xl text-blue-950 text-left space-y-1">
-                      <div className="font-bold flex items-center gap-1.5 text-blue-900 text-xs">
-                        <CheckCircle2 className="w-4 h-4 text-blue-700" />
-                        <span>Exemplaire réservé pour la file d'attente (Statut RÉSERVÉ)</span>
-                      </div>
-                      <div className="text-[11px] text-blue-900">
-                        Attribué en priorité à : <strong>{returnResult.reservedStudent.prenom} {returnResult.reservedStudent.nom}</strong> ({returnResult.reservedStudent.numeroEtudiant})
-                      </div>
-                      <div className="text-[10px] text-blue-800">
-                        E-mail de notification consigné dans le journal • Date limite de retrait (24h) : <strong>{returnResult.dateLimiteRetrait ? new Date(returnResult.dateLimiteRetrait).toLocaleDateString('fr-FR') : ''}</strong>
-                      </div>
-                      <div className="text-[10px] text-slate-600 italic pt-0.5">
-                        Rangement normal en tiroir : le gestionnaire ne fait aucun geste supplémentaire.
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-amber-800 font-medium">
-                      Exemplaire <strong>{returnResult.exemplaire.codeQR}</strong> remis au statut <strong>DISPONIBLE</strong>.
-                    </p>
-                  )}
+              {/* Consigne de rangement en rayon */}
+              <div className="p-5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-slate-900 space-y-2 shadow-xs">
+                <span className="text-[11px] uppercase font-extrabold tracking-wider text-amber-800">
+                  Consigne de rangement
+                </span>
+                <div className="text-2xl font-extrabold font-mono text-amber-950 flex items-center justify-center gap-2">
+                  <MapPin className="w-6 h-6 text-amber-600 shrink-0" />
+                  <span>Ranger : tiroir {returnResult.emplacement.tiroir}, rangée {returnResult.emplacement.rangee}</span>
                 </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 text-purple-900 space-y-1">
-                  <div className="font-bold flex items-center justify-center gap-1.5">
-                    <Wrench className="w-4 h-4 text-purple-700" />
-                    <span>Dommage constaté : Exemplaire mis EN RÉPARATION</span>
-                  </div>
-                  <p className="text-[11px] text-purple-800">
-                    L'exemplaire <strong>{returnResult.exemplaire.codeQR}</strong> est marqué avec état = abîmé et placé en réparation.
-                  </p>
-                  <p className="text-[10px] text-purple-700 font-medium">
-                    Il n'est pas compté comme disponible et personne dans la file n'est prévenu tant qu'il n'est pas réparé.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleScanAnother}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition"
-                >
-                  Scanner un Autre Retour
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition"
-                >
-                  Terminer
-                </button>
-              </div>
-            </div>
-          ) : targetExemplaire ? (
-            /* Copy scanned, now choose physical condition (Bon état vs Dommage constaté) */
-            <div className="space-y-4 animate-in fade-in">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Ouvrage :</span>
-                  <span className="font-bold text-slate-900 text-right">{targetOuvrage?.titre}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Exemplaire scanné :</span>
-                  <span className="font-mono font-bold text-amber-800">{targetExemplaire.codeQR} (Cote : {targetOuvrage?.cote})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Emplacement habituel :</span>
-                  <span className="font-mono font-bold text-slate-800">Tiroir {targetExemplaire.emplacement.tiroir}, Rangée {targetExemplaire.emplacement.rangee}</span>
-                </div>
-
-                {targetActiveLoan ? (
-                  <div className="pt-2 border-t border-slate-200 space-y-1">
-                    <div className="flex justify-between text-slate-700">
-                      <span>Emprunteur :</span>
-                      <strong>{targetStudent?.prenom} {targetStudent?.nom} ({targetStudent?.numeroEtudiant})</strong>
-                    </div>
-                    {isLoanLate ? (
-                      <div className="text-rose-600 font-bold text-[11px] flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        <span>En retard de {daysLateCount} jour(s) — Le retour est accepté et lèvera le blocage</span>
-                      </div>
-                    ) : (
-                      <div className="text-emerald-700 text-[11px]">
-                        Emprunt dans les temps (échéance : {new Date(targetActiveLoan.dateRetourPrevue).toLocaleDateString('fr-FR')})
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="pt-2 border-t border-slate-200 text-amber-800 font-medium text-[11px]">
-                    Livre lu sur place : aucun emprunt actif enregistré pour cet exemplaire.
-                  </div>
-                )}
+                <p className="text-xs text-amber-800 font-medium mt-1">
+                  Exemplaire <strong>{returnResult.exemplaire.codeQR}</strong> remis au statut <strong>DISPONIBLE</strong>.
+                </p>
               </div>
 
-              {/* Two choices required by rules: Bon état (DISPONIBLE) ou Dommage constaté (EN_REPARATION) */}
-              <div className="space-y-2">
-                <label className="font-bold text-slate-800 block text-xs">
-                  Constat de l'état physique de l'exemplaire rendu :
-                </label>
-
-                <div className="grid grid-cols-2 gap-3">
+              {/* Bouton unique principal Reclasser */}
+              <div className="pt-2">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleConfirmReturn('bon')}
-                    className="p-3.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-950 font-bold text-left transition flex flex-col justify-between space-y-1 group active:scale-95 shadow-2xs"
+                    onClick={handleReclasser}
+                    className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow-xs flex items-center justify-center gap-2"
                   >
-                    <div className="flex items-center gap-1.5 text-emerald-800 font-extrabold text-xs">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>Bon état</span>
-                    </div>
-                    <span className="text-[10px] text-emerald-700 font-normal">
-                      Passe à DISPONIBLE & prêt pour le rangement en rayon.
-                    </span>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Reclasser</span>
                   </button>
-
                   <button
                     type="button"
-                    onClick={() => handleConfirmReturn('abime')}
-                    className="p-3.5 rounded-xl border-2 border-purple-400 bg-purple-50/70 hover:bg-purple-100 text-purple-950 font-bold text-left transition flex flex-col justify-between space-y-1 group active:scale-95 shadow-2xs"
+                    onClick={handleClose}
+                    className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
                   >
-                    <div className="flex items-center gap-1.5 text-purple-800 font-extrabold text-xs">
-                      <Wrench className="w-4 h-4 text-purple-600" />
-                      <span>Dommage constaté</span>
-                    </div>
-                    <span className="text-[10px] text-purple-700 font-normal">
-                      Passe à EN RÉPARATION avec état abîmé.
-                    </span>
+                    Fermer sans confirmation
                   </button>
                 </div>
-              </div>
-
-              <div className="text-right pt-2">
-                <button
-                  type="button"
-                  onClick={handleScanAnother}
-                  className="text-slate-500 hover:text-slate-800 text-[11px] underline"
-                >
-                  Scanner un autre code QR
-                </button>
               </div>
             </div>
           ) : (
@@ -522,7 +369,7 @@ export const ScanReturnModal: React.FC = () => {
                   <button
                     type="submit"
                     disabled={!manualCode.trim()}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold text-white ${
+                    className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold text-white ${
                       manualCode.trim() ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-300'
                     }`}
                   >
@@ -539,7 +386,7 @@ export const ScanReturnModal: React.FC = () => {
         <div className="p-3 bg-slate-50 border-t border-slate-200 text-right">
           <button
             onClick={handleClose}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:bg-slate-100"
+            className="min-h-[44px] px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 hover:bg-slate-100 transition"
           >
             Fermer
           </button>
