@@ -380,10 +380,10 @@ export const StudentCatalogView: React.FC<StudentCatalogViewProps> = ({
             }`}
           />
 
-          {/* Drawer coulissant fixe à gauche : w-[260px], z-50 */}
+          {/* Drawer coulissant fixe à gauche : w-[288px], z-50 */}
           <div 
             onClick={(e) => e.stopPropagation()}
-            className={`fixed left-0 top-0 h-full w-[260px] z-50 transform transition-transform duration-250 ease-in-out flex flex-col justify-between shadow-2xl border-r border-white/10 ${
+            className={`fixed left-0 top-0 h-full w-[288px] z-50 transform transition-transform duration-250 ease-in-out flex flex-col justify-between shadow-2xl border-r border-white/10 ${
               mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
             }`}
             style={{ backgroundColor: THEME.sidebar.bg, color: THEME.sidebar.text }}
@@ -427,9 +427,9 @@ export const StudentCatalogView: React.FC<StudentCatalogViewProps> = ({
                 )}
               </div>
 
-              {/* Trois options de menu */}
+              {/* Menu principal étudiant */}
               <nav className="p-3 space-y-1.5 text-[13px] flex-1">
-                {/* a) « Mon historique » */}
+                {/* « Mon historique » */}
                 <button
                   type="button"
                   onClick={() => {
@@ -441,29 +441,29 @@ export const StudentCatalogView: React.FC<StudentCatalogViewProps> = ({
                   <History className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>Mon historique</span>
                 </button>
-
-                {/* b) « Accès Gestionnaire » */}
-                <button
-                  type="button"
-                  onClick={handleManagerAccessAction}
-                  className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer text-left"
-                >
-                  <Lock className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span>Accès Gestionnaire</span>
-                </button>
               </nav>
             </div>
 
-            {/* c) « Se déconnecter » (en bas du drawer) */}
-            <div className="p-3 border-t border-white/10 text-[13px] shrink-0">
-              <button
-                type="button"
-                onClick={handleStudentLogoutAction}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-rose-300 hover:text-white hover:bg-rose-500/20 transition cursor-pointer text-left"
-              >
-                <LogOut className="w-4 h-4 shrink-0 text-rose-400" />
-                <span>Se déconnecter</span>
-              </button>
+            {/* Bas du drawer : « Accès Gestionnaire » à côté de « Se déconnecter » */}
+            <div className="p-2.5 border-t border-white/10 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleManagerAccessAction}
+                  className="flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition cursor-pointer whitespace-nowrap"
+                >
+                  <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span>Accès Gestionnaire</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStudentLogoutAction}
+                  className="shrink-0 flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-[11px] font-medium text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/20 transition cursor-pointer whitespace-nowrap"
+                >
+                  <LogOut className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                  <span>Se déconnecter</span>
+                </button>
+              </div>
             </div>
           </div>
         </>
@@ -512,8 +512,20 @@ export const StudentCatalogView: React.FC<StudentCatalogViewProps> = ({
                 {userMenuOpen && (
                   <div
                     role="menu"
-                    className="absolute right-0 mt-1.5 w-44 rounded-xl bg-white border border-slate-200 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
+                    className="absolute right-0 mt-1.5 w-48 rounded-xl bg-white border border-slate-200 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
                   >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        setIsHistoryOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer text-left"
+                    >
+                      <History className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Mon historique</span>
+                    </button>
                     <button
                       type="button"
                       role="menuitem"

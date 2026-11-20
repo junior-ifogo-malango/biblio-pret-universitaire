@@ -356,7 +356,7 @@ export const INITIAL_EXEMPLAIRES: Exemplaire[] = [
   { id: 'ex_601', ouvrageId: 'ow_6', codeQR: 'EX-6001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T1', rangee: 'R1' } },
   { id: 'ex_602', ouvrageId: 'ow_6', codeQR: 'EX-6002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T1', rangee: 'R1' } },
   { id: 'ex_701', ouvrageId: 'ow_7', codeQR: 'EX-7001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R2' } },
-  { id: 'ex_702', ouvrageId: 'ow_7', codeQR: 'EX-7002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R2' } },
+  { id: 'ex_702', ouvrageId: 'ow_7', codeQR: 'EX-7002', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R2' } },
   { id: 'ex_801', ouvrageId: 'ow_8', codeQR: 'EX-8001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R3' } },
   { id: 'ex_802', ouvrageId: 'ow_8', codeQR: 'EX-8002', statut: 'DISPONIBLE', emplacement: { tiroir: 'T3', rangee: 'R3' } },
   { id: 'ex_901', ouvrageId: 'ow_9', codeQR: 'EX-9001', statut: 'EMPRUNTE', emplacement: { tiroir: 'T3', rangee: 'R4' } },
@@ -440,7 +440,8 @@ export const INITIAL_ADHERENTS: Adherent[] = [
   { id: 'adh_037', numeroEtudiant: 'ETU-037', nom: 'Moutawakil', prenom: 'Ilyas', emailAcademique: 'ifogojunior168+etu037@gmail.com', filiere: 'Chimie', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
   { id: 'adh_038', numeroEtudiant: 'ETU-038', nom: 'Benomar', prenom: 'Loubna', emailAcademique: 'loubna.benomar@usmba.ac.ma', filiere: 'Droit', niveau: 'M2', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
   { id: 'adh_039', numeroEtudiant: 'ETU-039', nom: 'El Hachimi', prenom: 'Rachid', emailAcademique: 'ifogojunior168+etu039@gmail.com', filiere: 'Économie', niveau: 'L1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
-  { id: 'adh_040', numeroEtudiant: 'ETU-040', nom: 'Boukhari', prenom: 'Samira', emailAcademique: 'samira.boukhari@usmba.ac.ma', filiere: 'Histoire', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' }
+  { id: 'adh_040', numeroEtudiant: 'ETU-040', nom: 'Boukhari', prenom: 'Samira', emailAcademique: 'samira.boukhari@usmba.ac.ma', filiere: 'Histoire', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' },
+  { id: 'adh_041', numeroEtudiant: 'ETU-041', nom: 'Ifogo', prenom: 'Junior', emailAcademique: 'ifogojunior168@gmail.com', filiere: 'Informatique', niveau: 'M1', dateInscription: '2026-09-01', dateExpiration: '2027-08-31', statut: 'actif' }
 ];
 
 export const INITIAL_EMPRUNTS: Emprunt[] = [
@@ -712,6 +713,30 @@ export const INITIAL_EMPRUNTS: Emprunt[] = [
     dateRetourEffective: getRelativeDate(-6),
     nbRappels: 0,
     statut: 'rendu'
+  },
+  {
+    id: 'emp_022',
+    loanNumber: 'PRT-2026-0022',
+    adherentId: 'adh_041',
+    exemplaireId: 'ex_102',
+    ouvrageId: 'ow_1',
+    dateEmprunt: getRelativeDate(-21),
+    dateRetourPrevue: getRelativeDate(-6),
+    dateRetourEffective: getRelativeDate(-8),
+    nbRappels: 0,
+    statut: 'rendu',
+    notes: 'Restitué dans les délais'
+  },
+  {
+    id: 'emp_023',
+    loanNumber: 'PRT-2026-0023',
+    adherentId: 'adh_041',
+    exemplaireId: 'ex_702',
+    ouvrageId: 'ow_7',
+    dateEmprunt: getRelativeDate(-3),
+    dateRetourPrevue: getRelativeDate(12),
+    nbRappels: 0,
+    statut: 'en_cours'
   }
 ];
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Upload, 
@@ -29,6 +29,17 @@ export const ImportStudentsModal: React.FC = () => {
     total: number;
   } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isImportStudentsOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isImportStudentsOpen]);
 
   if (!isImportStudentsOpen) return null;
 
@@ -115,30 +126,38 @@ ETU-2026-0120,Saidi,Anwar,anwar.saidi@usmba.ac.ma`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4"
+      onClick={handleClose}
+    >
+      <div
+        className="bg-white w-full h-full sm:h-auto sm:max-w-2xl rounded-none sm:rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-screen sm:max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+        <div className="bg-slate-900 text-white px-5 sm:px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
               <Upload className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-base font-bold font-serif">Importer la Liste des Étudiants Inscrits</h2>
-              <p className="text-xs text-slate-400">Fichier officiel fourni par le Service des Inscriptions</p>
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold font-serif truncate">Importer la Liste des Étudiants Inscrits</h2>
+              <p className="text-xs text-slate-400 truncate">Fichier officiel fourni par le Service des Inscriptions</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={handleClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition shrink-0 cursor-pointer"
+            aria-label="Fermer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-5 text-xs">
+        <div className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
           
           {/* Rules info */}
           <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-slate-700 leading-relaxed space-y-1">
@@ -277,7 +296,7 @@ ETU-2026-0120,Saidi,Anwar,anwar.saidi@usmba.ac.ma`;
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
           <button
             type="button"
             onClick={handleClose}

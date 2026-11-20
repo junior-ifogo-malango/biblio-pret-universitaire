@@ -15,12 +15,11 @@ import {
   ArrowRight,
   Maximize2,
   Minimize2,
-  ImagePlus,
   RefreshCw
 } from 'lucide-react';
 import { useLibrary } from '../context/LibraryContext';
 import { Ouvrage, Exemplaire, Adherent, Emprunt } from '../types';
-import { decodeQRFromImageFile, detectQRCodeFromVideo, openCameraStream } from '../utils/qrUtils';
+import { detectQRCodeFromVideo, openCameraStream } from '../utils/qrUtils';
 
 export const ScanLoanModal: React.FC = () => {
   const { 
@@ -61,12 +60,10 @@ export const ScanLoanModal: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameId = useRef<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const stepRef = useRef<1 | 2>(1);
   const exemplaireCodeRef = useRef<string>('');
   const isOpenRef = useRef<boolean>(false);
   const [cameraError, setCameraError] = useState(false);
-  const [imageScanError, setImageScanError] = useState<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   stepRef.current = step;
@@ -117,7 +114,6 @@ export const ScanLoanModal: React.FC = () => {
     setShowCancelConfirm(false);
     setIsCancelled(false);
     setCameraError(false);
-    setImageScanError(null);
   };
 
   const startCamera = async () => {
@@ -186,7 +182,6 @@ export const ScanLoanModal: React.FC = () => {
   };
 
   const handleQRDetected = (val: string) => {
-    setImageScanError(null);
     if (stepRef.current === 1) {
       // Step 1: Exemplaire scanned
       exemplaireCodeRef.current = val;
@@ -204,21 +199,6 @@ export const ScanLoanModal: React.FC = () => {
       setStudentCode(val);
       finalizeLoan(exemplaireCodeRef.current, val);
     }
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-
-    setImageScanError(null);
-    const decoded = await decodeQRFromImageFile(file);
-    if (!decoded) {
-      setImageScanError("Aucun QR code lisible détecté dans cette image. Utilisez un vrai PNG généré depuis l'application.");
-      return;
-    }
-
-    handleQRDetected(decoded);
   };
 
   const finalizeLoan = (exVal: string, studVal: string) => {
@@ -251,7 +231,6 @@ export const ScanLoanModal: React.FC = () => {
     const clean = manualExCode.trim();
     exemplaireCodeRef.current = clean;
     stepRef.current = 2;
-    setImageScanError(null);
     setExemplaireCode(clean);
     setStep(2);
   };
@@ -535,7 +514,7 @@ export const ScanLoanModal: React.FC = () => {
                 {cameraError && (
                   <div className="p-4 text-center text-xs text-slate-300 space-y-2">
                     <p className="font-semibold text-amber-300">Caméra inactive ou non autorisée</p>
-                    <p className="text-[11px] text-slate-400">Importez une photo/image QR ou utilisez la saisie de secours ci-dessous.</p>
+                    <p className="text-[11px] text-slate-400">Utilisez la saisie de secours ci-dessous.</p>
                     <button
                       type="button"
                       onClick={startCamera}
@@ -544,32 +523,6 @@ export const ScanLoanModal: React.FC = () => {
                       <RefreshCw className="w-3.5 h-3.5" /> Réessayer la caméra
                     </button>
                   </div>
-                )}
-              </div>
-
-              {/* Importer une image QR (utile avec le PNG téléchargé ou sans webcam) */}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] transition cursor-pointer"
-                >
-                  <ImagePlus className="w-3.5 h-3.5 text-amber-600" />
-                  <span>
-                    {step === 1
-                      ? "Importer l'image QR de l'exemplaire"
-                      : "Importer l'image QR de la carte étudiant"}
-                  </span>
-                </button>
-                {imageScanError && (
-                  <span className="text-[11px] text-rose-600 font-medium">{imageScanError}</span>
                 )}
               </div>
 

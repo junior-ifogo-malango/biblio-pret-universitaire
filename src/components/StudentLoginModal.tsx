@@ -1,7 +1,31 @@
 import React, { useState } from 'react';
-import { X, AlertCircle, Loader2, Mail, ArrowRight } from 'lucide-react';
+import { X, AlertCircle, Loader2, Mail, ArrowRight, Copy, Check } from 'lucide-react';
 import { seConnecterGoogle, seConnecter, ConnectedStudent } from '../services/authService';
 import { useLibrary } from '../context/LibraryContext';
+
+const PRODUCTION_AUTH_URL = 'https://gestion-pret-bibliotheque.web.app/';
+
+const isRunningInAIStudio = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  if (
+    host === 'gestion-pret-bibliotheque.web.app' ||
+    host === 'gestion-pret-bibliotheque.firebaseapp.com'
+  ) {
+    return false;
+  }
+  let inIframe = false;
+  try {
+    inIframe = window.self !== window.top;
+  } catch {
+    inIframe = true;
+  }
+  const isAIStudioHost =
+    host.endsWith('.run.app') ||
+    host.includes('aistudio.google.com') ||
+    host.includes('googleusercontent.com');
+  return inIframe || isAIStudioHost;
+};
 
 interface StudentLoginModalProps {
   isOpen: boolean;
@@ -16,13 +40,22 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
 }) => {
   const { adherents, allowedAcademicDomain, ensureStudentAdherent } = useLibrary();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showAIStudioNotice, setShowAIStudioNotice] = useState(false);
+  const [copiedProdUrl, setCopiedProdUrl] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [emailInput, setEmailInput] = useState('');
 
   if (!isOpen) return null;
 
+  const inAIStudio = isRunningInAIStudio();
+
   const handleGoogleSignIn = async () => {
     setErrorMsg(null);
+    if (inAIStudio) {
+      setShowAIStudioNotice(true);
+      return;
+    }
+    setShowAIStudioNotice(false);
     setIsConnectingGoogle(true);
     try {
       const result = await seConnecterGoogle(adherents, allowedAcademicDomain);
@@ -40,6 +73,14 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
       setErrorMsg(err?.message || "Une erreur inattendue est survenue.");
     } finally {
       setIsConnectingGoogle(false);
+    }
+  };
+
+  const handleCopyProdUrl = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(PRODUCTION_AUTH_URL).catch(() => {});
+      setCopiedProdUrl(true);
+      setTimeout(() => setCopiedProdUrl(false), 3000);
     }
   };
 
@@ -66,6 +107,7 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
 
   const handleClose = () => {
     setErrorMsg(null);
+    setShowAIStudioNotice(false);
     onClose();
   };
 
@@ -118,6 +160,37 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
         </div>
 
         <div className="p-6 space-y-4">
+          {showAIStudioNotice && (
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-2 animate-in fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="leading-snug font-semibold">
+                  Pour vous authentifier, veuillez copier cet URL dans votre navigateur et tester :
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-amber-200 font-mono text-[10px] text-slate-800 break-all select-all">
+                <span>{PRODUCTION_AUTH_URL}</span>
+                <button
+                  type="button"
+                  onClick={handleCopyProdUrl}
+                  className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] flex items-center gap-1 shrink-0 font-sans font-semibold transition cursor-pointer"
+                >
+                  {copiedProdUrl ? (
+                    <>
+                      <Check className="w-3 h-3" />
+                      <span>Copié</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copier</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />

@@ -401,6 +401,96 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   })();
 
+  // Migration unique : s'assurer que l'étudiant ifogojunior168@gmail.com existe avec ses 2 emprunts même si localStorage contient déjà des données
+  (() => {
+    if (shouldMigrateOldDemo) return;
+    try {
+      if (localStorage.getItem('unilib_ifogo_2loans_migrated_v1') === '1') return;
+
+      const savedAdh = localStorage.getItem(STORAGE_KEY_ADHERENTS);
+      const savedEmp = localStorage.getItem(STORAGE_KEY_EMPRUNTS);
+      const savedEx = localStorage.getItem(STORAGE_KEY_EXEMPLAIRES);
+
+      if (savedAdh || savedEmp) {
+        const adhList: Adherent[] = savedAdh ? JSON.parse(savedAdh) : [...INITIAL_ADHERENTS];
+        const empList: Emprunt[] = savedEmp ? JSON.parse(savedEmp) : [...INITIAL_EMPRUNTS];
+        const exList: Exemplaire[] = savedEx ? JSON.parse(savedEx) : [...INITIAL_EXEMPLAIRES];
+
+        const seedAdh = INITIAL_ADHERENTS.find(a => a.id === 'adh_041')!;
+        const targetEmail = 'ifogojunior168@gmail.com';
+        let existingIdx = adhList.findIndex(
+          a => a.emailAcademique?.trim().toLowerCase() === targetEmail
+        );
+        if (existingIdx === -1) {
+          existingIdx = adhList.findIndex(a => a.id === 'adh_041');
+        }
+
+        let targetAdhId = seedAdh.id;
+        if (existingIdx >= 0) {
+          const cur = adhList[existingIdx];
+          targetAdhId = cur.id;
+          adhList[existingIdx] = {
+            ...cur,
+            nom: cur.nom && cur.nom !== 'Étudiant' ? cur.nom : seedAdh.nom,
+            prenom: cur.prenom && cur.prenom !== 'Lecteur' ? cur.prenom : seedAdh.prenom,
+            emailAcademique: targetEmail,
+            filiere: cur.filiere || seedAdh.filiere,
+            niveau: cur.niveau || seedAdh.niveau,
+            statut: 'actif',
+            dateExpiration: cur.dateExpiration && cur.dateExpiration >= currentDate ? cur.dateExpiration : seedAdh.dateExpiration
+          };
+        } else {
+          const usedNums = new Set(adhList.map(a => a.numeroEtudiant?.trim().toUpperCase()));
+          const numero = usedNums.has(seedAdh.numeroEtudiant)
+            ? `ETU-${String(adhList.length + 1).padStart(3, '0')}`
+            : seedAdh.numeroEtudiant;
+          adhList.push({ ...seedAdh, numeroEtudiant: numero });
+        }
+
+        const existingStudentLoans = empList.filter(
+          e => e.adherentId === targetAdhId && !e.annule
+        );
+        if (existingStudentLoans.length < 2) {
+          const seedLoans = INITIAL_EMPRUNTS.filter(e => e.id === 'emp_022' || e.id === 'emp_023');
+          for (const sl of seedLoans) {
+            if (empList.some(e => e.id === sl.id)) continue;
+            let exemplaireId = sl.exemplaireId;
+            let ouvrageId = sl.ouvrageId;
+
+            if (sl.statut === 'en_cours') {
+              const targetEx = exList.find(ex => ex.id === exemplaireId);
+              if (!targetEx || targetEx.statut !== 'DISPONIBLE') {
+                const fallbackEx = exList.find(ex => ex.statut === 'DISPONIBLE' && ex.ouvrageId !== 'ow_3');
+                if (fallbackEx) {
+                  exemplaireId = fallbackEx.id;
+                  ouvrageId = fallbackEx.ouvrageId;
+                  fallbackEx.statut = 'EMPRUNTE';
+                }
+              } else {
+                targetEx.statut = 'EMPRUNTE';
+              }
+            }
+
+            empList.push({
+              ...sl,
+              adherentId: targetAdhId,
+              exemplaireId,
+              ouvrageId
+            });
+          }
+        }
+
+        localStorage.setItem(STORAGE_KEY_ADHERENTS, JSON.stringify(adhList));
+        localStorage.setItem(STORAGE_KEY_EMPRUNTS, JSON.stringify(empList));
+        localStorage.setItem(STORAGE_KEY_EXEMPLAIRES, JSON.stringify(exList));
+      }
+
+      localStorage.setItem('unilib_ifogo_2loans_migrated_v1', '1');
+    } catch {
+      // Ignore storage migration errors
+    }
+  })();
+
   const ensureStudentAdherent = (student: ConnectedStudent): Adherent => {
     const cleanEmail = student.email.trim().toLowerCase();
     const existing = adherents.find(a =>

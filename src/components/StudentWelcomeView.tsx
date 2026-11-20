@@ -8,17 +8,49 @@ interface StudentWelcomeViewProps {
   onLoginSuccess: (student: ConnectedStudent) => void;
 }
 
+const PRODUCTION_AUTH_URL = 'https://gestion-pret-bibliotheque.web.app/';
+
+const isRunningInAIStudio = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  if (
+    host === 'gestion-pret-bibliotheque.web.app' ||
+    host === 'gestion-pret-bibliotheque.firebaseapp.com'
+  ) {
+    return false;
+  }
+  let inIframe = false;
+  try {
+    inIframe = window.self !== window.top;
+  } catch {
+    inIframe = true;
+  }
+  const isAIStudioHost =
+    host.endsWith('.run.app') ||
+    host.includes('aistudio.google.com') ||
+    host.includes('googleusercontent.com');
+  return inIframe || isAIStudioHost;
+};
+
 export const StudentWelcomeView: React.FC<StudentWelcomeViewProps> = ({ onLoginSuccess }) => {
   const { setIsManagerLoginOpen, adherents, allowedAcademicDomain, ensureStudentAdherent } = useLibrary();
   const [isConnecting, setIsConnecting] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [authError, setAuthError] = useState<{ message: string; code?: string; domainHint?: string } | null>(null);
+  const [showAIStudioNotice, setShowAIStudioNotice] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
+  const [copiedProdUrl, setCopiedProdUrl] = useState(false);
 
   const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+  const inAIStudio = isRunningInAIStudio();
 
   const handleGoogleSignIn = async () => {
     setAuthError(null);
+    if (inAIStudio) {
+      setShowAIStudioNotice(true);
+      return;
+    }
+    setShowAIStudioNotice(false);
     setIsConnecting(true);
     try {
       const result: AuthResult = await seConnecterGoogle(adherents, allowedAcademicDomain);
@@ -75,6 +107,14 @@ export const StudentWelcomeView: React.FC<StudentWelcomeViewProps> = ({ onLoginS
     }
   };
 
+  const handleCopyProdUrl = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(PRODUCTION_AUTH_URL).catch(() => {});
+      setCopiedProdUrl(true);
+      setTimeout(() => setCopiedProdUrl(false), 3000);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Contenu centré */}
@@ -97,6 +137,38 @@ export const StudentWelcomeView: React.FC<StudentWelcomeViewProps> = ({ onLoginS
           {/* Bloc d'authentification */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/80 shadow-sm space-y-5 text-left">
 
+            {/* Message invité AI Studio : copier l'URL dans le navigateur */}
+            {showAIStudioNotice && (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-2.5 animate-in fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="leading-snug font-semibold">
+                    Pour vous authentifier, veuillez copier cet URL dans votre navigateur et tester :
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 p-2.5 bg-white rounded-lg border border-amber-200 font-mono text-[11px] text-slate-800 break-all select-all">
+                  <span>{PRODUCTION_AUTH_URL}</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyProdUrl}
+                    className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] flex items-center gap-1 shrink-0 font-sans font-semibold transition cursor-pointer"
+                  >
+                    {copiedProdUrl ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copié</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copier l'URL</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Alerte Erreur avec explications si domaine non autorisé */}
             {authError && (
               <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-2 animate-in fade-in">
@@ -111,7 +183,30 @@ export const StudentWelcomeView: React.FC<StudentWelcomeViewProps> = ({ onLoginS
                 {authError.code === 'auth/unauthorized-domain' && (
                   <div className="mt-2 pt-2 border-t border-rose-200/70 text-[11px] space-y-2 text-rose-800">
                     <p className="font-semibold text-slate-800">
-                      Comment autoriser ce domaine pour Google OAuth :
+                      Pour vous authentifier, veuillez copier cet URL dans votre navigateur et tester :
+                    </p>
+                    <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-rose-200 font-mono text-[11px] text-slate-800 break-all select-all">
+                      <span>{PRODUCTION_AUTH_URL}</span>
+                      <button
+                        type="button"
+                        onClick={handleCopyProdUrl}
+                        className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] flex items-center gap-1 shrink-0 font-sans font-semibold transition cursor-pointer"
+                      >
+                        {copiedProdUrl ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            <span>Copié</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copier</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="font-semibold text-slate-800 pt-1">
+                      Ou autorisez ce domaine pour Google OAuth :
                     </p>
                     <ol className="list-decimal list-inside space-y-1 text-slate-700">
                       <li>Ouvrez la <a href={`https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`} target="_blank" rel="noopener noreferrer" className="underline font-semibold text-amber-700 inline-flex items-center gap-0.5">Console Firebase (Paramètres d'Authentification) <ExternalLink className="w-3 h-3" /></a></li>
