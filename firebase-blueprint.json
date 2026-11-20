@@ -7,73 +7,28 @@
       "properties": {
         "uid": {
           "type": "string",
-          "description": "Identifiant Firebase Auth de l'étudiant",
-          "maxLength": 128,
-          "pattern": "^[a-zA-Z0-9_\\-]+$"
+          "description": "Identifiant Firebase Auth de l'étudiant"
         },
         "email": {
           "type": "string",
-          "format": "email",
-          "description": "Adresse e-mail Google validée",
-          "maxLength": 320
+          "description": "Adresse e-mail Google validée"
         },
         "displayName": {
           "type": "string",
-          "description": "Nom complet de l'étudiant Google",
-          "maxLength": 200
+          "description": "Nom complet de l'étudiant Google"
         },
-        "updatedAt": {
+        "lastLogin": {
           "type": "string",
-          "format": "date-time",
-          "description": "Horodatage serveur de dernière connexion"
+          "description": "Date de dernière connexion"
         }
       },
-      "required": ["uid", "email", "updatedAt"]
-    },
-    "OuvrageCover": {
-      "title": "OuvrageCover",
-      "description": "Référence publique de couverture d'un ouvrage du catalogue",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Identifiant unique de l'ouvrage",
-          "maxLength": 128,
-          "pattern": "^[a-zA-Z0-9_\\-]+$"
-        },
-        "titre": {
-          "type": "string",
-          "description": "Titre de l'ouvrage",
-          "maxLength": 300
-        },
-        "coverUrl": {
-          "type": "string",
-          "description": "Chemin ou URL de la couverture",
-          "maxLength": 1000
-        },
-        "ownerUid": {
-          "type": "string",
-          "description": "Identifiant Firebase Auth de l'utilisateur ayant synchronisé l'entrée",
-          "maxLength": 128,
-          "pattern": "^[a-zA-Z0-9_\\-]+$"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Horodatage serveur de mise à jour"
-        }
-      },
-      "required": ["id", "titre", "coverUrl", "ownerUid", "updatedAt"]
+      "required": ["uid", "email"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "Documents de profil privé des étudiants"
-    },
-    "/ouvrages/{ouvrageId}": {
-      "schema": "OuvrageCover",
-      "description": "Métadonnées de couverture des ouvrages du catalogue"
     }
   }
 }

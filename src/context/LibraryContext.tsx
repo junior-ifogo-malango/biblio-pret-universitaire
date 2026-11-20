@@ -318,22 +318,14 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
   const currentDate = new Date().toISOString().split('T')[0];
   const [allowedAcademicDomain, setAllowedAcademicDomainState] = useState<string>(() => {
     try {
-      const migrated = localStorage.getItem('biblio_all_accounts_migrated_v1');
       const saved = localStorage.getItem('biblio_academic_domain');
-      if (!migrated) {
-        localStorage.setItem('biblio_all_accounts_migrated_v1', '1');
-        if (!saved || saved === '@gmail.com' || saved === '@usmba.ac.ma') {
-          localStorage.setItem('biblio_academic_domain', '*');
-          return '*';
-        }
-      }
-      if (!saved) {
-        localStorage.setItem('biblio_academic_domain', '*');
-        return '*';
+      if (!saved || saved === '@usmba.ac.ma' || saved === '*') {
+        localStorage.setItem('biblio_academic_domain', '@gmail.com');
+        return '@gmail.com';
       }
       return saved;
     } catch {
-      return '*';
+      return '@gmail.com';
     }
   });
 
@@ -401,96 +393,6 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   })();
 
-  // Migration unique : s'assurer que l'étudiant ifogojunior168@gmail.com existe avec ses 2 emprunts même si localStorage contient déjà des données
-  (() => {
-    if (shouldMigrateOldDemo) return;
-    try {
-      if (localStorage.getItem('unilib_ifogo_2loans_migrated_v1') === '1') return;
-
-      const savedAdh = localStorage.getItem(STORAGE_KEY_ADHERENTS);
-      const savedEmp = localStorage.getItem(STORAGE_KEY_EMPRUNTS);
-      const savedEx = localStorage.getItem(STORAGE_KEY_EXEMPLAIRES);
-
-      if (savedAdh || savedEmp) {
-        const adhList: Adherent[] = savedAdh ? JSON.parse(savedAdh) : [...INITIAL_ADHERENTS];
-        const empList: Emprunt[] = savedEmp ? JSON.parse(savedEmp) : [...INITIAL_EMPRUNTS];
-        const exList: Exemplaire[] = savedEx ? JSON.parse(savedEx) : [...INITIAL_EXEMPLAIRES];
-
-        const seedAdh = INITIAL_ADHERENTS.find(a => a.id === 'adh_041')!;
-        const targetEmail = 'ifogojunior168@gmail.com';
-        let existingIdx = adhList.findIndex(
-          a => a.emailAcademique?.trim().toLowerCase() === targetEmail
-        );
-        if (existingIdx === -1) {
-          existingIdx = adhList.findIndex(a => a.id === 'adh_041');
-        }
-
-        let targetAdhId = seedAdh.id;
-        if (existingIdx >= 0) {
-          const cur = adhList[existingIdx];
-          targetAdhId = cur.id;
-          adhList[existingIdx] = {
-            ...cur,
-            nom: cur.nom && cur.nom !== 'Étudiant' ? cur.nom : seedAdh.nom,
-            prenom: cur.prenom && cur.prenom !== 'Lecteur' ? cur.prenom : seedAdh.prenom,
-            emailAcademique: targetEmail,
-            filiere: cur.filiere || seedAdh.filiere,
-            niveau: cur.niveau || seedAdh.niveau,
-            statut: 'actif',
-            dateExpiration: cur.dateExpiration && cur.dateExpiration >= currentDate ? cur.dateExpiration : seedAdh.dateExpiration
-          };
-        } else {
-          const usedNums = new Set(adhList.map(a => a.numeroEtudiant?.trim().toUpperCase()));
-          const numero = usedNums.has(seedAdh.numeroEtudiant)
-            ? `ETU-${String(adhList.length + 1).padStart(3, '0')}`
-            : seedAdh.numeroEtudiant;
-          adhList.push({ ...seedAdh, numeroEtudiant: numero });
-        }
-
-        const existingStudentLoans = empList.filter(
-          e => e.adherentId === targetAdhId && !e.annule
-        );
-        if (existingStudentLoans.length < 2) {
-          const seedLoans = INITIAL_EMPRUNTS.filter(e => e.id === 'emp_022' || e.id === 'emp_023');
-          for (const sl of seedLoans) {
-            if (empList.some(e => e.id === sl.id)) continue;
-            let exemplaireId = sl.exemplaireId;
-            let ouvrageId = sl.ouvrageId;
-
-            if (sl.statut === 'en_cours') {
-              const targetEx = exList.find(ex => ex.id === exemplaireId);
-              if (!targetEx || targetEx.statut !== 'DISPONIBLE') {
-                const fallbackEx = exList.find(ex => ex.statut === 'DISPONIBLE' && ex.ouvrageId !== 'ow_3');
-                if (fallbackEx) {
-                  exemplaireId = fallbackEx.id;
-                  ouvrageId = fallbackEx.ouvrageId;
-                  fallbackEx.statut = 'EMPRUNTE';
-                }
-              } else {
-                targetEx.statut = 'EMPRUNTE';
-              }
-            }
-
-            empList.push({
-              ...sl,
-              adherentId: targetAdhId,
-              exemplaireId,
-              ouvrageId
-            });
-          }
-        }
-
-        localStorage.setItem(STORAGE_KEY_ADHERENTS, JSON.stringify(adhList));
-        localStorage.setItem(STORAGE_KEY_EMPRUNTS, JSON.stringify(empList));
-        localStorage.setItem(STORAGE_KEY_EXEMPLAIRES, JSON.stringify(exList));
-      }
-
-      localStorage.setItem('unilib_ifogo_2loans_migrated_v1', '1');
-    } catch {
-      // Ignore storage migration errors
-    }
-  })();
-
   const ensureStudentAdherent = (student: ConnectedStudent): Adherent => {
     const cleanEmail = student.email.trim().toLowerCase();
     const existing = adherents.find(a =>
@@ -538,24 +440,15 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const initialById = new Map(INITIAL_OUVRAGES.map(item => [item.id, item]));
-          const migratedList = parsed.map((o: Ouvrage) => {
-            let next = o;
+          return parsed.map((o: Ouvrage) => {
             // Si une couverture locale dédiée existe et que l'URL actuelle est vide ou openlibrary ou obsolète
-            if (LOCAL_COVERS_MAP[next.id] && (!next.coverUrl || next.coverUrl.includes('openlibrary.org') || !next.coverUrl.startsWith('/covers/'))) {
-              next = { ...next, coverUrl: LOCAL_COVERS_MAP[next.id] };
+            if (LOCAL_COVERS_MAP[o.id] && (!o.coverUrl || o.coverUrl.includes('openlibrary.org') || !o.coverUrl.startsWith('/covers/'))) {
+              return { ...o, coverUrl: LOCAL_COVERS_MAP[o.id] };
             }
-            const seed = initialById.get(next.id);
-            if (seed && (!next.resume || (next.resume.trim().length < 220 && seed.resume.length > next.resume.trim().length))) {
-              next = { ...next, resume: seed.resume };
-            }
-            return next;
+            return o;
           });
-          localStorage.setItem('unilib_resumes_5sentences_v1', '1');
-          return migratedList;
         }
       }
-      localStorage.setItem('unilib_resumes_5sentences_v1', '1');
       return INITIAL_OUVRAGES;
     } catch {
       return INITIAL_OUVRAGES;
@@ -1801,85 +1694,62 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       console.warn("Erreur d'écriture localStorage:", err);
     }
 
-    // Synchronisation Firestore (uniquement si un utilisateur vérifié est connecté)
+    // Synchronisation Firestore
     try {
-      const { auth, db, handleFirestoreError, OperationType } = await import('../firebase');
-      const currentUser = auth.currentUser;
-      if (currentUser && currentUser.emailVerified) {
-        const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-        for (const ow of updated) {
-          if (LOCAL_COVERS_MAP[ow.id]) {
-            const path = `ouvrages/${ow.id}`;
-            try {
-              await setDoc(
-                doc(db, 'ouvrages', ow.id),
-                {
-                  id: ow.id.slice(0, 128),
-                  titre: ow.titre.slice(0, 300),
-                  coverUrl: LOCAL_COVERS_MAP[ow.id].slice(0, 1000),
-                  ownerUid: currentUser.uid.slice(0, 128),
-                  updatedAt: serverTimestamp()
-                },
-                { merge: true }
-              );
-            } catch (fsErr) {
-              handleFirestoreError(fsErr, OperationType.WRITE, path);
-            }
-          }
+      const { db } = await import('../firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
+      for (const ow of updated) {
+        if (LOCAL_COVERS_MAP[ow.id]) {
+          await setDoc(
+            doc(db, 'ouvrages', ow.id),
+            {
+              id: ow.id,
+              titre: ow.titre,
+              coverUrl: LOCAL_COVERS_MAP[ow.id],
+              updatedAt: new Date().toISOString()
+            },
+            { merge: true }
+          );
         }
       }
     } catch (err: any) {
-      console.warn("Synchronisation Firestore :", err);
+      console.warn("Synchronisation Firestore (mode hors-ligne ou non disponible):", err);
     }
 
     return { success: true, count: updatedCount };
   };
 
-  // Mise à jour des 20 couvertures locales vers Firestore uniquement lorsque l'utilisateur est authentifié
+  // Mise à jour automatique des 20 couvertures locales vers Firestore au démarrage
   useEffect(() => {
     let isCancelled = false;
-    let unsubscribe: (() => void) | undefined;
-
-    const initSyncOnAuth = async () => {
+    const autoSyncToFirestore = async () => {
       try {
-        const { auth, db, handleFirestoreError, OperationType } = await import('../firebase');
-        const { onAuthStateChanged } = await import('firebase/auth');
-        const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-
-        unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (isCancelled || !user || !user.emailVerified) return;
-          for (const [id, coverUrl] of Object.entries(LOCAL_COVERS_MAP)) {
-            if (isCancelled) break;
-            const ow = INITIAL_OUVRAGES.find(o => o.id === id);
-            if (ow) {
-              const path = `ouvrages/${id}`;
-              try {
-                await setDoc(
-                  doc(db, 'ouvrages', id),
-                  {
-                    id: id.slice(0, 128),
-                    titre: ow.titre.slice(0, 300),
-                    coverUrl: coverUrl.slice(0, 1000),
-                    ownerUid: user.uid.slice(0, 128),
-                    updatedAt: serverTimestamp()
-                  },
-                  { merge: true }
-                );
-              } catch (fsErr) {
-                handleFirestoreError(fsErr, OperationType.WRITE, path);
-              }
-            }
+        const { db } = await import('../firebase');
+        const { doc, setDoc } = await import('firebase/firestore');
+        for (const [id, coverUrl] of Object.entries(LOCAL_COVERS_MAP)) {
+          if (isCancelled) break;
+          const ow = INITIAL_OUVRAGES.find(o => o.id === id);
+          if (ow) {
+            await setDoc(
+              doc(db, 'ouvrages', id),
+              {
+                id,
+                titre: ow.titre,
+                coverUrl,
+                updatedAt: new Date().toISOString()
+              },
+              { merge: true }
+            );
           }
-        });
+        }
       } catch (err) {
         console.warn("Mise à jour automatique Firestore en arrière-plan:", err);
       }
     };
 
-    initSyncOnAuth();
+    autoSyncToFirestore();
     return () => {
       isCancelled = true;
-      if (unsubscribe) unsubscribe();
     };
   }, []);
 

@@ -17,7 +17,6 @@ import {
 import { useLibrary } from '../context/LibraryContext';
 import { Ouvrage, Exemplaire } from '../types';
 import { BookCover } from './BookCover';
-import { ExpandableSummary } from './ExpandableSummary';
 
 export const BookDetailModal: React.FC = () => {
   const { 
@@ -107,13 +106,9 @@ export const BookDetailModal: React.FC = () => {
           {/* Summary */}
           <div className="space-y-1.5">
             <h4 className="font-bold uppercase tracking-wider text-slate-400 text-[10px]">Description & Référence</h4>
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-              <ExpandableSummary
-                text={selectedOuvrage.resume}
-                clampLines={3}
-                textClassName="text-slate-700 leading-relaxed"
-              />
-            </div>
+            <p className="text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+              {selectedOuvrage.resume}
+            </p>
             <div className="flex items-center justify-between text-slate-400 text-[11px] px-1">
               <span>ISBN : <strong className="font-mono text-slate-700">{selectedOuvrage.isbn}</strong></span>
               <span>Pagination : {selectedOuvrage.pagination} pages</span>

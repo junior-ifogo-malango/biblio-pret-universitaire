@@ -18,7 +18,6 @@ import { useLibrary } from '../context/LibraryContext';
 import { BookCategory, Ouvrage } from '../types';
 import { INITIAL_OUVRAGES } from '../data/mockData';
 import { BookCover } from './BookCover';
-import { ExpandableSummary } from './ExpandableSummary';
 import { BulkFillCatalogModal } from './BulkFillCatalogModal';
 
 type ManagerSortOption = 'added-order' | 'title-asc' | 'year-desc';
@@ -328,13 +327,9 @@ export const BooksView: React.FC = () => {
 
                     {/* Résumé */}
                     {ow.resume && (
-                      <div className="mt-2 bg-slate-50/70 p-2 rounded-lg border border-slate-100">
-                        <ExpandableSummary
-                          text={ow.resume}
-                          clampLines={2}
-                          textClassName="text-xs text-slate-500 leading-relaxed"
-                        />
-                      </div>
+                      <p className="text-xs text-slate-500 line-clamp-2 mt-2 leading-relaxed bg-slate-50/70 p-2 rounded-lg border border-slate-100">
+                        {ow.resume}
+                      </p>
                     )}
                   </div>
                 </div>

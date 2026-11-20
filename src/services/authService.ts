@@ -9,8 +9,7 @@ import {
   onAuthStateChanged, 
   User 
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
+import { auth, googleProvider } from '../firebase';
 import { Adherent } from '../types';
 
 export interface ConnectedStudent {
@@ -45,7 +44,7 @@ export const normalizeDomain = (domain: string): string => {
  */
 export const isEmailDomainAllowed = (
   email: string,
-  allowedDomain: string = '*'
+  allowedDomain: string = '@gmail.com'
 ): boolean => {
   const cleanEmail = email.trim().toLowerCase();
 
@@ -58,8 +57,8 @@ export const isEmailDomainAllowed = (
     .map(domain => domain.trim().replace(/^@/, ''))
     .filter(Boolean);
 
-  // Autoriser tous les domaines si * ou vide
-  if (domains.length === 0 || domains.includes('*') || domains.includes('all')) {
+  // Autoriser tous les domaines si *
+  if (domains.includes('*') || domains.includes('all')) {
     return true;
   }
 
@@ -108,26 +107,6 @@ export const buildStudentProfile = (
   };
 };
 
-const withTimeout = <T,>(promise: Promise<T>, ms: number, timeoutErrorCode: string): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      const err: any = new Error(`Operation timed out (${timeoutErrorCode})`);
-      err.code = timeoutErrorCode;
-      reject(err);
-    }, ms);
-    promise.then(
-      (val) => {
-        clearTimeout(timer);
-        resolve(val);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      }
-    );
-  });
-};
-
 /**
  * 1. Authentification Google via Firebase Auth
  * Ouvre une fenêtre popup Google. Accepte tout compte Google valide.
@@ -137,11 +116,7 @@ export const seConnecterGoogle = async (
   allowedDomain: string = '*'
 ): Promise<AuthResult> => {
   try {
-    const cred = await withTimeout(
-      signInWithPopup(auth, googleProvider),
-      45000,
-      'auth/popup-timeout'
-    );
+    const cred = await signInWithPopup(auth, googleProvider);
     const user: User = cred.user;
     const cleanEmail = user.email?.trim().toLowerCase() || '';
 
@@ -187,32 +162,6 @@ export const seConnecterGoogle = async (
       console.warn("Erreur d'écriture localStorage:", err);
     }
 
-    // Sauvegarde du profil utilisateur dans Firestore (avec délai max de 4s pour ne jamais bloquer la connexion)
-    const userDocPath = `users/${user.uid}`;
-    const profilePayload: Record<string, unknown> = {
-      uid: user.uid.slice(0, 128),
-      email: cleanEmail.slice(0, 320),
-      updatedAt: serverTimestamp()
-    };
-    if (user.displayName && user.displayName.trim()) {
-      profilePayload.displayName = user.displayName.trim().slice(0, 200);
-    }
-    withTimeout(
-      setDoc(doc(db, 'users', user.uid), profilePayload, { merge: true }),
-      4000,
-      'firestore/timeout'
-    ).catch((fsErr: any) => {
-      if (fsErr?.code === 'permission-denied') {
-        try {
-          handleFirestoreError(fsErr, OperationType.WRITE, userDocPath);
-        } catch (logged) {
-          console.warn("Erreur de permission Firestore lors de la sauvegarde du profil :", logged);
-        }
-      } else {
-        console.warn("Sauvegarde différée du profil Firestore :", fsErr?.message || fsErr);
-      }
-    });
-
     return {
       success: true,
       student: connected
@@ -221,14 +170,6 @@ export const seConnecterGoogle = async (
     const code = error?.code || '';
     const rawMessage = error?.message || (typeof error === 'string' ? error : error?.stack || '');
     const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
-
-    if (code === 'auth/popup-timeout') {
-      return {
-        success: false,
-        errorCode: code,
-        error: "La fenêtre Google n'a pas répondu à temps (pop-up bloquée ou fermée). Réessayez ou utilisez la connexion par e-mail ci-dessous."
-      };
-    }
 
     const isUnauthorizedDomain = 
       code === 'auth/unauthorized-domain' || 
@@ -243,7 +184,7 @@ export const seConnecterGoogle = async (
         success: false,
         errorCode: 'auth/unauthorized-domain',
         authorizedDomainHint: currentHost,
-        error: `Le domaine "${currentHost}" n'est pas encore autorisé pour OAuth dans la console Firebase. Vous pouvez vous connecter immédiatement par e-mail ci-dessous.`
+        error: `Le domaine "${currentHost}" n'est pas encore autorisé pour OAuth dans la console Firebase. Vous pouvez vous connecter immédiatement via l'accès rapide ci-dessous ou ajouter ce domaine dans votre console Firebase.`
       };
     }
     if (code === 'auth/operation-not-allowed') {
@@ -251,7 +192,7 @@ export const seConnecterGoogle = async (
       return {
         success: false,
         errorCode: code,
-        error: "Le fournisseur Google n'est pas encore activé dans Firebase. Vous pouvez vous connecter directement par e-mail ci-dessous."
+        error: "Le fournisseur Google n'est pas encore activé dans votre console Firebase (Authentication > Mode de connexion > Google). Vous pouvez vous connecter directement par e-mail ci-dessous."
       };
     }
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
@@ -267,7 +208,7 @@ export const seConnecterGoogle = async (
       return {
         success: false,
         errorCode: code,
-        error: "La fenêtre pop-up Google a été bloquée par le navigateur. Autorisez les pop-ups ou utilisez la connexion par e-mail ci-dessous."
+        error: "La fenêtre pop-up Google a été bloquée par le navigateur. Vous pouvez autoriser les pop-ups ou vous connecter directement via la saisie de votre e-mail."
       };
     }
     if (code === 'auth/network-request-failed') {

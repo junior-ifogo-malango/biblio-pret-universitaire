@@ -96,22 +96,19 @@ const RootView: React.FC = () => {
     setConnectedStudent(student);
   };
 
-  const authSyncRef = React.useRef({ adherents, allowedAcademicDomain, ensureStudentAdherent });
-  authSyncRef.current = { adherents, allowedAcademicDomain, ensureStudentAdherent };
-
   React.useEffect(() => {
     const unsub = observerEtatAuth(
       (student) => {
         if (student) {
-          authSyncRef.current.ensureStudentAdherent(student);
+          ensureStudentAdherent(student);
           setConnectedStudent(student);
         }
       },
-      authSyncRef.current.adherents,
-      authSyncRef.current.allowedAcademicDomain
+      adherents,
+      allowedAcademicDomain
     );
     return () => unsub();
-  }, []);
+  }, [adherents, allowedAcademicDomain, ensureStudentAdherent]);
 
   const activePrintOuvrage = activePrintLabelsOuvrageId ? getOuvrageById(activePrintLabelsOuvrageId) : null;
   const copiesToPrint = activePrintLabelExemplaireIds
@@ -120,15 +117,11 @@ const RootView: React.FC = () => {
       ? exemplaires.filter(e => e.ouvrageId === activePrintLabelsOuvrageId)
       : [];
 
-  const [scanError, setScanError] = React.useState<string | null>(null);
-
   const handleScanDetected = (scannedCode: string) => {
     setIsQRScannerOpen(false);
     const res = scanQRCode(scannedCode);
     if (!res.found) {
-      setScanError(`Code QR "${scannedCode}" introuvable dans le système universitaire (ni exemplaire, ni carte étudiante).`);
-    } else {
-      setScanError(null);
+      alert(`Code QR "${scannedCode}" introuvable dans le système universitaire (ni exemplaire, ni carte étudiante).`);
     }
   };
 
@@ -195,22 +188,6 @@ const RootView: React.FC = () => {
         isOpen={isGlobalSearchOpen} 
         onClose={() => setIsGlobalSearchOpen(false)} 
       />
-
-      {scanError && (
-        <div
-          role="alert"
-          className="fixed bottom-4 right-4 z-50 max-w-md rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-900 shadow-lg flex items-start gap-3"
-        >
-          <span className="flex-1">{scanError}</span>
-          <button
-            type="button"
-            onClick={() => setScanError(null)}
-            className="text-rose-700 hover:text-rose-900 font-bold cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
     </div>
   );

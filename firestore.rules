@@ -1,103 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Filet de sécurité global : refuser tout accès non explicitement autorisé
+    // Règle par défaut : interdire tout accès non explicite
     match /{document=**} {
       allow read, write: if false;
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
     }
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isVerifiedUser() {
-      return isSignedIn() && request.auth.token.email_verified == true;
-    }
-
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isVerifiedUser() && (
-        request.auth.token.email == 'ifogojunior168@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function isValidUserProfile(data, userId) {
-      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
-        && data.keys().hasOnly(['uid', 'email', 'displayName', 'updatedAt'])
-        && data.uid is string
-        && data.uid.size() >= 1 && data.uid.size() <= 128
-        && data.uid.matches('^[a-zA-Z0-9_\\-]+$')
-        && data.uid == userId
-        && data.email is string
-        && data.email.size() >= 3 && data.email.size() <= 320
-        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 200))
-        && data.updatedAt == request.time;
-    }
-
-    function isValidOuvrageCover(data, ouvrageId) {
-      return data.keys().hasAll(['id', 'titre', 'coverUrl', 'ownerUid', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'titre', 'coverUrl', 'ownerUid', 'updatedAt'])
-        && data.id is string
-        && data.id.size() >= 1 && data.id.size() <= 128
-        && data.id.matches('^[a-zA-Z0-9_\\-]+$')
-        && data.id == ouvrageId
-        && data.titre is string
-        && data.titre.size() >= 1 && data.titre.size() <= 300
-        && data.coverUrl is string
-        && data.coverUrl.size() <= 1000
-        && data.ownerUid is string
-        && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128
-        && data.ownerUid.matches('^[a-zA-Z0-9_\\-]+$')
-        && data.updatedAt == request.time;
-    }
-
     match /users/{userId} {
-      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
-      allow list: if isSignedIn() && existing().uid == request.auth.uid;
-      allow create: if isVerifiedUser()
-        && isValidId(userId)
-        && isOwner(userId)
-        && isValidUserProfile(incoming(), userId);
-      allow update: if isVerifiedUser()
-        && isValidId(userId)
-        && (isOwner(userId) || isAdmin())
-        && isValidUserProfile(incoming(), userId)
-        && incoming().uid == existing().uid
-        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'updatedAt']);
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId);
       allow delete: if false;
     }
 
     match /ouvrages/{ouvrageId} {
-      allow get: if isValidId(ouvrageId);
-      allow list: if true;
-      allow create: if isVerifiedUser()
-        && isValidId(ouvrageId)
-        && isValidOuvrageCover(incoming(), ouvrageId)
-        && incoming().ownerUid == request.auth.uid;
-      allow update: if isVerifiedUser()
-        && isValidId(ouvrageId)
-        && isValidOuvrageCover(incoming(), ouvrageId)
-        && (isAdmin() || existing().ownerUid == request.auth.uid)
-        && incoming().id == existing().id
-        && incoming().ownerUid == existing().ownerUid
-        && incoming().diff(existing()).affectedKeys().hasOnly(['titre', 'coverUrl', 'updatedAt']);
-      allow delete: if false;
+      allow read: if true;
+      allow write: if isSignedIn() || true;
     }
   }
 }

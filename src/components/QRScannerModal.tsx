@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import jsQR from 'jsqr';
 import { Camera, X, AlertCircle, RefreshCw, Keyboard } from 'lucide-react';
-import { detectQRCodeFromVideo, openCameraStream } from '../utils/qrUtils';
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -45,15 +45,23 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     setIsScanning(true);
 
     try {
-      const stream = await openCameraStream();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError("La caméra n'est pas supportée sur ce navigateur. Veuillez utiliser la saisie manuelle ci-dessous.");
+        setIsScanning(false);
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+
       streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.muted = true;
         videoRef.current.setAttribute('playsinline', 'true');
         await videoRef.current.play();
-        void scanFrame();
+        scanFrame();
       }
     } catch (err: any) {
       console.warn("Camera access failed or denied:", err);
@@ -77,23 +85,35 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     setIsScanning(false);
   };
 
-  const scanFrame = async () => {
-    if (!streamRef.current) return;
+  const scanFrame = () => {
+    if (!videoRef.current || !canvasRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
+      animationFrameId.current = requestAnimationFrame(scanFrame);
+      return;
+    }
 
-    if (videoRef.current && canvasRef.current) {
-      const detected = await detectQRCodeFromVideo(videoRef.current, canvasRef.current);
-      if (detected) {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+
+    if (context) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+
+      if (code && code.data.trim()) {
+        const detected = code.data.trim();
         stopCamera();
         onScan(detected);
         return;
       }
     }
 
-    if (streamRef.current) {
-      animationFrameId.current = requestAnimationFrame(() => {
-        void scanFrame();
-      });
-    }
+    animationFrameId.current = requestAnimationFrame(scanFrame);
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -134,9 +154,6 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           <div className="relative w-full aspect-4/3 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-800 shadow-inner">
             <video
               ref={videoRef}
-              autoPlay
-              muted
-              playsInline
               className={`w-full h-full object-cover ${cameraError ? 'hidden' : 'block'}`}
             />
             <canvas ref={canvasRef} className="hidden" />
