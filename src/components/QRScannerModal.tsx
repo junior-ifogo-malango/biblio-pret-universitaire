@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import jsQR from 'jsqr';
-import { Camera, X, AlertCircle, RefreshCw, Keyboard } from 'lucide-react';
+import { Camera, X, AlertCircle, RefreshCw, Keyboard, ImagePlus } from 'lucide-react';
+import { decodeQRFromImageFile, detectQRCodeFromVideo, openCameraStream } from '../utils/qrUtils';
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -24,12 +24,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameId = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [imageScanError, setImageScanError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
       setManualCode('');
       setCameraError(null);
+      setImageScanError(null);
       return;
     }
 
@@ -45,27 +48,19 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     setIsScanning(true);
 
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError("La caméra n'est pas supportée sur ce navigateur. Veuillez utiliser la saisie manuelle ci-dessous.");
-        setIsScanning(false);
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
-      });
-
+      const stream = await openCameraStream();
       streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
         videoRef.current.setAttribute('playsinline', 'true');
         await videoRef.current.play();
-        scanFrame();
+        void scanFrame();
       }
     } catch (err: any) {
       console.warn("Camera access failed or denied:", err);
-      setCameraError("Impossible d'activer la caméra (autorisation refusée ou caméra occupée). Utilisez la saisie manuelle ci-dessous.");
+      setCameraError("Impossible d'activer la caméra (autorisation refusée ou caméra occupée). Utilisez l'import d'image ou la saisie manuelle ci-dessous.");
       setIsScanning(false);
     }
   };
@@ -85,35 +80,39 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     setIsScanning(false);
   };
 
-  const scanFrame = () => {
-    if (!videoRef.current || !canvasRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      animationFrameId.current = requestAnimationFrame(scanFrame);
-      return;
-    }
+  const scanFrame = async () => {
+    if (!streamRef.current) return;
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-
-    if (context) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert',
-      });
-
-      if (code && code.data.trim()) {
-        const detected = code.data.trim();
+    if (videoRef.current && canvasRef.current) {
+      const detected = await detectQRCodeFromVideo(videoRef.current, canvasRef.current);
+      if (detected) {
         stopCamera();
         onScan(detected);
         return;
       }
     }
 
-    animationFrameId.current = requestAnimationFrame(scanFrame);
+    if (streamRef.current) {
+      animationFrameId.current = requestAnimationFrame(() => {
+        void scanFrame();
+      });
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setImageScanError(null);
+    const decoded = await decodeQRFromImageFile(file);
+    if (!decoded) {
+      setImageScanError("Aucun QR code lisible détecté dans cette image.");
+      return;
+    }
+
+    stopCamera();
+    onScan(decoded);
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -154,6 +153,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           <div className="relative w-full aspect-4/3 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-800 shadow-inner">
             <video
               ref={videoRef}
+              autoPlay
+              muted
+              playsInline
               className={`w-full h-full object-cover ${cameraError ? 'hidden' : 'block'}`}
             />
             <canvas ref={canvasRef} className="hidden" />
@@ -182,6 +184,27 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                   <RefreshCw className="w-3.5 h-3.5" /> Réessayer la caméra
                 </button>
               </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] transition cursor-pointer"
+            >
+              <ImagePlus className="w-3.5 h-3.5 text-amber-600" />
+              <span>Importer une image QR</span>
+            </button>
+            {imageScanError && (
+              <span className="text-[11px] text-rose-600 font-medium">{imageScanError}</span>
             )}
           </div>
 

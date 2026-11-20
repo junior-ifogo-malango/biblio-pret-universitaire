@@ -20,6 +20,8 @@ export const ExpandableSummary: React.FC<ExpandableSummaryProps> = ({
   const [needsExpansion, setNeedsExpansion] = useState(false);
   const paragraphRef = useRef<HTMLParagraphElement>(null);
 
+  const hasLongText = text.trim().length > (clampLines === 2 ? 120 : 180);
+
   useEffect(() => {
     setIsExpanded(false);
   }, [text]);
@@ -30,18 +32,24 @@ export const ExpandableSummary: React.FC<ExpandableSummaryProps> = ({
 
     const checkOverflow = () => {
       if (!isExpanded) {
-        setNeedsExpansion(el.scrollHeight > el.clientHeight + 2);
+        setNeedsExpansion(el.scrollHeight > el.clientHeight + 2 || hasLongText);
       }
     };
 
     checkOverflow();
+    const rafId = requestAnimationFrame(checkOverflow);
 
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(checkOverflow);
       observer.observe(el);
-      return () => observer.disconnect();
+      return () => {
+        cancelAnimationFrame(rafId);
+        observer.disconnect();
+      };
     }
-  }, [text, isExpanded, clampLines]);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [text, isExpanded, clampLines, hasLongText]);
 
   const clampClass =
     clampLines === 2
@@ -58,7 +66,7 @@ export const ExpandableSummary: React.FC<ExpandableSummaryProps> = ({
       >
         {text}
       </p>
-      {(needsExpansion || isExpanded) && (
+      {(needsExpansion || hasLongText || isExpanded) && (
         <button
           type="button"
           onClick={(e) => {

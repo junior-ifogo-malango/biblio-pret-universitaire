@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import jsQR from 'jsqr';
 import { 
   X, 
   Camera, 
@@ -9,10 +8,13 @@ import {
   AlertTriangle, 
   Keyboard,
   Maximize2,
-  Minimize2
+  Minimize2,
+  ImagePlus,
+  RefreshCw
 } from 'lucide-react';
 import { useLibrary } from '../context/LibraryContext';
 import { Exemplaire, Ouvrage, Adherent } from '../types';
+import { decodeQRFromImageFile, detectQRCodeFromVideo, openCameraStream } from '../utils/qrUtils';
 
 export const ScanReturnModal: React.FC = () => {
   const { 
@@ -44,6 +46,7 @@ export const ScanReturnModal: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameId = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [cameraError, setCameraError] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -70,19 +73,14 @@ export const ScanReturnModal: React.FC = () => {
   const startCamera = async () => {
     setCameraError(false);
     try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError(true);
-        return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
-      });
+      const stream = await openCameraStream();
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
         videoRef.current.setAttribute('playsinline', 'true');
         await videoRef.current.play();
-        scanFrames();
+        void scanFrames();
       }
     } catch {
       setCameraError(true);
@@ -103,33 +101,22 @@ export const ScanReturnModal: React.FC = () => {
     }
   };
 
-  const scanFrames = () => {
-    if (!videoRef.current || !canvasRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      animFrameId.current = requestAnimationFrame(scanFrames);
-      return;
-    }
+  const scanFrames = async () => {
+    if (!streamRef.current) return;
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    if (ctx) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imgData.data, imgData.width, imgData.height, {
-        inversionAttempts: 'dontInvert'
-      });
-
-      if (code && code.data.trim()) {
-        const val = code.data.trim();
+    if (videoRef.current && canvasRef.current) {
+      const val = await detectQRCodeFromVideo(videoRef.current, canvasRef.current);
+      if (val) {
         handleCopyScanned(val);
         return;
       }
     }
 
-    animFrameId.current = requestAnimationFrame(scanFrames);
+    if (streamRef.current) {
+      animFrameId.current = requestAnimationFrame(() => {
+        void scanFrames();
+      });
+    }
   };
 
   const handleCopyScanned = (codeVal: string) => {
@@ -175,6 +162,20 @@ export const ScanReturnModal: React.FC = () => {
       markLoanReclasse(activeOrRecentLoan?.id, returnResult.exemplaire.codeQR);
     }
     handleClose();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const decoded = await decodeQRFromImageFile(file);
+    if (!decoded) {
+      setErrorMessage("Aucun QR code lisible détecté dans cette image.");
+      return;
+    }
+
+    handleCopyScanned(decoded);
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -325,6 +326,9 @@ export const ScanReturnModal: React.FC = () => {
               <div className="relative w-full aspect-16/10 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-800 shadow-inner">
                 <video
                   ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
                   className={`w-full h-full object-cover ${cameraError ? 'hidden' : 'block'}`}
                 />
                 <canvas ref={canvasRef} className="hidden" />
@@ -342,11 +346,36 @@ export const ScanReturnModal: React.FC = () => {
                 )}
 
                 {cameraError && (
-                  <div className="p-4 text-center text-xs text-slate-300 space-y-1">
-                    <p className="font-semibold text-amber-300">Caméra inactive ou non disponible</p>
-                    <p className="text-[11px] text-slate-400">Utilisez la saisie manuelle ci-dessous.</p>
+                  <div className="p-4 text-center text-xs text-slate-300 space-y-2">
+                    <p className="font-semibold text-amber-300">Caméra inactive ou non autorisée</p>
+                    <p className="text-[11px] text-slate-400">Importez une photo/image QR ou utilisez la saisie manuelle ci-dessous.</p>
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Réessayer la caméra
+                    </button>
                   </div>
                 )}
+              </div>
+
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] transition cursor-pointer"
+                >
+                  <ImagePlus className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Importer une image QR</span>
+                </button>
               </div>
 
               {/* Manual input fallback */}

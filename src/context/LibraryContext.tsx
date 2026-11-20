@@ -448,7 +448,6 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const needsResumeMigration = localStorage.getItem('unilib_resumes_5sentences_v1') !== '1';
           const initialById = new Map(INITIAL_OUVRAGES.map(item => [item.id, item]));
           const migratedList = parsed.map((o: Ouvrage) => {
             let next = o;
@@ -456,17 +455,13 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (LOCAL_COVERS_MAP[next.id] && (!next.coverUrl || next.coverUrl.includes('openlibrary.org') || !next.coverUrl.startsWith('/covers/'))) {
               next = { ...next, coverUrl: LOCAL_COVERS_MAP[next.id] };
             }
-            if (needsResumeMigration) {
-              const seed = initialById.get(next.id);
-              if (seed && (!next.resume || next.resume.trim().length < seed.resume.length)) {
-                next = { ...next, resume: seed.resume };
-              }
+            const seed = initialById.get(next.id);
+            if (seed && (!next.resume || (next.resume.trim().length < 220 && seed.resume.length > next.resume.trim().length))) {
+              next = { ...next, resume: seed.resume };
             }
             return next;
           });
-          if (needsResumeMigration) {
-            localStorage.setItem('unilib_resumes_5sentences_v1', '1');
-          }
+          localStorage.setItem('unilib_resumes_5sentences_v1', '1');
           return migratedList;
         }
       }
