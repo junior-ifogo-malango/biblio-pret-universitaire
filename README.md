@@ -7,7 +7,7 @@ Projet de cours de l'EST (Fès) : conception UML puis application de gestion d'u
 ## Diagrammes UML
 
 ### Cas d'utilisation
-![Diagramme de cas d'utilisation](diagrammes_uml/diagramme_de_cas_d'utilisation.png)
+![Diagramme de cas d'utilisation](diagrammes_uml/diagramme_de_cas_d'utlisation.png)
 
 ### Activité
 ![Diagramme d'activité](diagrammes_uml/diagramme_d'activiter.png)
