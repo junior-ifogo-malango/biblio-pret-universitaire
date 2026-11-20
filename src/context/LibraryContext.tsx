@@ -318,14 +318,22 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
   const currentDate = new Date().toISOString().split('T')[0];
   const [allowedAcademicDomain, setAllowedAcademicDomainState] = useState<string>(() => {
     try {
+      const migrated = localStorage.getItem('biblio_all_accounts_migrated_v1');
       const saved = localStorage.getItem('biblio_academic_domain');
-      if (!saved || saved === '@usmba.ac.ma' || saved === '*') {
-        localStorage.setItem('biblio_academic_domain', '@gmail.com');
-        return '@gmail.com';
+      if (!migrated) {
+        localStorage.setItem('biblio_all_accounts_migrated_v1', '1');
+        if (!saved || saved === '@gmail.com' || saved === '@usmba.ac.ma') {
+          localStorage.setItem('biblio_academic_domain', '*');
+          return '*';
+        }
+      }
+      if (!saved) {
+        localStorage.setItem('biblio_academic_domain', '*');
+        return '*';
       }
       return saved;
     } catch {
-      return '@gmail.com';
+      return '*';
     }
   });
 
@@ -440,15 +448,29 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.map((o: Ouvrage) => {
+          const needsResumeMigration = localStorage.getItem('unilib_resumes_5sentences_v1') !== '1';
+          const initialById = new Map(INITIAL_OUVRAGES.map(item => [item.id, item]));
+          const migratedList = parsed.map((o: Ouvrage) => {
+            let next = o;
             // Si une couverture locale dédiée existe et que l'URL actuelle est vide ou openlibrary ou obsolète
-            if (LOCAL_COVERS_MAP[o.id] && (!o.coverUrl || o.coverUrl.includes('openlibrary.org') || !o.coverUrl.startsWith('/covers/'))) {
-              return { ...o, coverUrl: LOCAL_COVERS_MAP[o.id] };
+            if (LOCAL_COVERS_MAP[next.id] && (!next.coverUrl || next.coverUrl.includes('openlibrary.org') || !next.coverUrl.startsWith('/covers/'))) {
+              next = { ...next, coverUrl: LOCAL_COVERS_MAP[next.id] };
             }
-            return o;
+            if (needsResumeMigration) {
+              const seed = initialById.get(next.id);
+              if (seed && (!next.resume || next.resume.trim().length < seed.resume.length)) {
+                next = { ...next, resume: seed.resume };
+              }
+            }
+            return next;
           });
+          if (needsResumeMigration) {
+            localStorage.setItem('unilib_resumes_5sentences_v1', '1');
+          }
+          return migratedList;
         }
       }
+      localStorage.setItem('unilib_resumes_5sentences_v1', '1');
       return INITIAL_OUVRAGES;
     } catch {
       return INITIAL_OUVRAGES;
@@ -1694,62 +1716,85 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       console.warn("Erreur d'écriture localStorage:", err);
     }
 
-    // Synchronisation Firestore
+    // Synchronisation Firestore (uniquement si un utilisateur vérifié est connecté)
     try {
-      const { db } = await import('../firebase');
-      const { doc, setDoc } = await import('firebase/firestore');
-      for (const ow of updated) {
-        if (LOCAL_COVERS_MAP[ow.id]) {
-          await setDoc(
-            doc(db, 'ouvrages', ow.id),
-            {
-              id: ow.id,
-              titre: ow.titre,
-              coverUrl: LOCAL_COVERS_MAP[ow.id],
-              updatedAt: new Date().toISOString()
-            },
-            { merge: true }
-          );
+      const { auth, db, handleFirestoreError, OperationType } = await import('../firebase');
+      const currentUser = auth.currentUser;
+      if (currentUser && currentUser.emailVerified) {
+        const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        for (const ow of updated) {
+          if (LOCAL_COVERS_MAP[ow.id]) {
+            const path = `ouvrages/${ow.id}`;
+            try {
+              await setDoc(
+                doc(db, 'ouvrages', ow.id),
+                {
+                  id: ow.id.slice(0, 128),
+                  titre: ow.titre.slice(0, 300),
+                  coverUrl: LOCAL_COVERS_MAP[ow.id].slice(0, 1000),
+                  ownerUid: currentUser.uid.slice(0, 128),
+                  updatedAt: serverTimestamp()
+                },
+                { merge: true }
+              );
+            } catch (fsErr) {
+              handleFirestoreError(fsErr, OperationType.WRITE, path);
+            }
+          }
         }
       }
     } catch (err: any) {
-      console.warn("Synchronisation Firestore (mode hors-ligne ou non disponible):", err);
+      console.warn("Synchronisation Firestore :", err);
     }
 
     return { success: true, count: updatedCount };
   };
 
-  // Mise à jour automatique des 20 couvertures locales vers Firestore au démarrage
+  // Mise à jour des 20 couvertures locales vers Firestore uniquement lorsque l'utilisateur est authentifié
   useEffect(() => {
     let isCancelled = false;
-    const autoSyncToFirestore = async () => {
+    let unsubscribe: (() => void) | undefined;
+
+    const initSyncOnAuth = async () => {
       try {
-        const { db } = await import('../firebase');
-        const { doc, setDoc } = await import('firebase/firestore');
-        for (const [id, coverUrl] of Object.entries(LOCAL_COVERS_MAP)) {
-          if (isCancelled) break;
-          const ow = INITIAL_OUVRAGES.find(o => o.id === id);
-          if (ow) {
-            await setDoc(
-              doc(db, 'ouvrages', id),
-              {
-                id,
-                titre: ow.titre,
-                coverUrl,
-                updatedAt: new Date().toISOString()
-              },
-              { merge: true }
-            );
+        const { auth, db, handleFirestoreError, OperationType } = await import('../firebase');
+        const { onAuthStateChanged } = await import('firebase/auth');
+        const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+
+        unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (isCancelled || !user || !user.emailVerified) return;
+          for (const [id, coverUrl] of Object.entries(LOCAL_COVERS_MAP)) {
+            if (isCancelled) break;
+            const ow = INITIAL_OUVRAGES.find(o => o.id === id);
+            if (ow) {
+              const path = `ouvrages/${id}`;
+              try {
+                await setDoc(
+                  doc(db, 'ouvrages', id),
+                  {
+                    id: id.slice(0, 128),
+                    titre: ow.titre.slice(0, 300),
+                    coverUrl: coverUrl.slice(0, 1000),
+                    ownerUid: user.uid.slice(0, 128),
+                    updatedAt: serverTimestamp()
+                  },
+                  { merge: true }
+                );
+              } catch (fsErr) {
+                handleFirestoreError(fsErr, OperationType.WRITE, path);
+              }
+            }
           }
-        }
+        });
       } catch (err) {
         console.warn("Mise à jour automatique Firestore en arrière-plan:", err);
       }
     };
 
-    autoSyncToFirestore();
+    initSyncOnAuth();
     return () => {
       isCancelled = true;
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

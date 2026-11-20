@@ -20,6 +20,7 @@ import { useLibrary } from '../context/LibraryContext';
 import { Ouvrage } from '../types';
 import { INITIAL_OUVRAGES } from '../data/mockData';
 import { BookCover } from './BookCover';
+import { ExpandableSummary } from './ExpandableSummary';
 import { ConnectedStudent, seDeconnecter } from '../services/authService';
 import { StudentHistoryModal } from './StudentHistoryModal';
 import { THEME } from '../utils/theme';
@@ -1118,9 +1119,13 @@ export const StudentCatalogView: React.FC<StudentCatalogViewProps> = ({
                       <h4 className="font-bold uppercase tracking-wider text-slate-400 text-[11px]">
                         Résumé
                       </h4>
-                      <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                        {ow.resume}
-                      </p>
+                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <ExpandableSummary
+                          text={ow.resume}
+                          clampLines={3}
+                          textClassName="text-xs text-slate-700 leading-relaxed"
+                        />
+                      </div>
                     </div>
                   )}
 

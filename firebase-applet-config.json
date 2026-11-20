@@ -1,12 +1,12 @@
 {
-  "projectId": "gestion-pret-bibliotheque",
-  "appId": "1:44584029720:web:72fb70ead211089b6b3d6d",
-  "apiKey": "AIzaSyBS8_BD8BZN1MArMrz7WaikuRwLGMUZB5Y",
-  "authDomain": "gestion-pret-bibliotheque.firebaseapp.com",
-  "firestoreDatabaseId": "(default)",
-  "storageBucket": "gestion-pret-bibliotheque.firebasestorage.app",
-  "messagingSenderId": "44584029720",
+  "projectId": "rugged-bond-0r8gb",
+  "appId": "1:730538161230:web:d8afa2c830c2d8d6ea3f1f",
+  "apiKey": "AIzaSyAySI_BAZpwPdSQj7m3kW3w-48aKErzKXI",
+  "authDomain": "rugged-bond-0r8gb.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-bibliopretuniver-f438a959-7105-478a-9a0b-dc250fb4bf01",
+  "storageBucket": "rugged-bond-0r8gb.firebasestorage.app",
+  "messagingSenderId": "730538161230",
   "measurementId": "",
-  "oAuthClientId": "",
+  "oAuthClientId": "730538161230-cqfa46fgj4bvd6pg3lmpvggg1pvbfml2.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }
