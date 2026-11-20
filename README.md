@@ -7,16 +7,16 @@ Projet de cours de l'EST (Fès) : conception UML puis application de gestion d'u
 ## Diagrammes UML
 
 ### Cas d'utilisation
-![Diagramme de cas d'utilisation](diagrammes/Diagramme_De_Cas_Utilisation.png)
+![Diagramme de cas d'utilisation](diagrammes_uml/diagramme_de_cas_d'tilisation.png)
 
 ### Activité
-![Diagramme d'activité](diagrammes/Diagramme_Activite.png)
+![Diagramme d'activité](diagrammes_uml/diagramme_d'activite.png)
 
 ### États
-![Diagramme d'états](diagrammes/Diagramme_Etat.png)
+![Diagramme d'états](diagrammes_uml/diagramme_d'etat.png)
 
 ### Séquence
-![Diagramme de séquence](diagrammes/Diagramme_Sequence.png)
+![Diagramme de séquence](diagrammes_uml/diagramme_de_sequence.png)
 
 ### Capture de l'application 
 ### 1.catalogue des ouvrages
